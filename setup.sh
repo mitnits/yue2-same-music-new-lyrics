@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# One-shot setup: YuE2 + SheetSage2 (required), and with --extras Audio Flamingo 3 + CLAP + Demucs.
+# One-shot setup: SheetSage2 (required by the Transcribe node), and with --extras Audio Flamingo 3 + CLAP + Demucs.
+# YuE2 itself runs inside ComfyUI (yue2_3b_bf16.safetensors from Comfy-Org/YuE2 in models/checkpoints).
 # Tested on Debian 13, RTX 5090, uv 0.11. Re-running is safe: existing environments and downloads are reused.
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
@@ -8,13 +9,7 @@ command -v uv >/dev/null || { echo "uv is required: https://docs.astral.sh/uv/";
 command -v ffmpeg >/dev/null || { echo "ffmpeg is required"; exit 1; }
 HF="uvx --from huggingface-hub[hf_transfer]==0.36.2 hf"
 
-echo "== YuE2 (repo, environment, weights)"
-[ -d YuE/.git ] || git clone --depth 1 https://github.com/multimodal-art-projection/YuE.git YuE
-[ -x YuE/.venv/bin/python ] || uv venv --python 3.12 YuE/.venv
-uv pip install --python YuE/.venv/bin/python ./YuE gradio "huggingface-hub[cli]==0.36.2"
-[ -f YuE/models/YuE2-3B/model.safetensors ] || $HF download m-a-p/YuE2-3B --local-dir YuE/models/YuE2-3B
-[ -f YuE/models/YuE2-Vae/model.safetensors ] || $HF download m-a-p/YuE2-Vae --local-dir YuE/models/YuE2-Vae
-
+mkdir -p YuE/models
 echo "== SheetSage2 (own environment: Python 3.11, torch 2.8)"
 [ -f YuE/models/SheetSage2/config.json ] || $HF download m-a-p/SheetSage2 --local-dir YuE/models/SheetSage2
 if [ ! -x YuE/.venv-sheetsage2/bin/python ]; then
@@ -35,6 +30,5 @@ if [ "$EXTRAS" = 1 ]; then
 fi
 
 echo
-echo "Done. Start the UI with ./start_ui.sh  (add --host 0.0.0.0 to reach it from other devices)."
-echo "ComfyUI: symlink comfyui/comfyui-yue2-same-music-new-lyrics into ComfyUI/custom_nodes and download"
+echo "Done. Symlink comfyui/comfyui-yue2-same-music-new-lyrics into ComfyUI/custom_nodes and download"
 echo "  https://huggingface.co/Comfy-Org/YuE2/resolve/main/checkpoints/yue2_3b_bf16.safetensors -> models/checkpoints/"

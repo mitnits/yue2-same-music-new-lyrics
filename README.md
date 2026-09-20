@@ -4,31 +4,29 @@ Take a song, keep its melody, sing new words. Built on [YuE2](https://github.com
 a recording is transcribed to an editable ABC score with [SheetSage2](https://huggingface.co/m-a-p/SheetSage2),
 then YuE2 renders that exact score with your lyrics, in your language, optionally an octave down or in another key.
 
-Two front ends over the same helpers:
-
-* **Gradio UI** (`yue2_ui.py`): generate, transcribe, edit, fit-check lyrics, transpose, render.
-* **ComfyUI custom nodes** (`comfyui/comfyui-yue2-same-music-new-lyrics`): the same steps as nodes around ComfyUI's
-  built-in YuE2 nodes, with an in-canvas score editor. Example workflows included.
+It is a set of **ComfyUI custom nodes** (`comfyui/comfyui-yue2-same-music-new-lyrics`) around ComfyUI's built-in
+YuE2 nodes: transcribe, edit the score on the canvas, fit-check the lyrics, transpose, render. Example workflows included.
 
 Optional extras: a style-prompt drafter that listens to the recording (Audio Flamingo 3 + CLAP), vocal/accompaniment
 separation (Demucs), voice-track repair, and a language-aware syllable fit check.
 
 ## Install
 
-Linux, NVIDIA GPU (24 GB VRAM for the full-quality preset; less works with fp8), [uv](https://docs.astral.sh/uv/), ffmpeg.
+Linux, NVIDIA GPU (24 GB VRAM for the full-quality preset), [ComfyUI](https://github.com/comfyanonymous/ComfyUI) 0.36+,
+[uv](https://docs.astral.sh/uv/), ffmpeg.
 
 ```bash
 git clone https://github.com/mitnits/yue2-same-music-new-lyrics ~/yue2-same-music-new-lyrics
 cd ~/yue2-same-music-new-lyrics
-./setup.sh            # YuE2 + SheetSage2 environments and weights (~11 GB)
+./setup.sh            # SheetSage2 environment and weights (~4 GB)
 ./setup.sh --extras   # also Audio Flamingo 3, CLAP, Demucs (~37 GB more)
-./start_ui.sh         # Gradio on http://127.0.0.1:7860
+ln -s ~/yue2-same-music-new-lyrics/comfyui/comfyui-yue2-same-music-new-lyrics <ComfyUI>/custom_nodes/
 ```
 
-For ComfyUI: symlink or copy `comfyui/comfyui-yue2-same-music-new-lyrics` into `ComfyUI/custom_nodes/`, put
-`yue2_3b_bf16.safetensors` in `models/checkpoints/` (from [Comfy-Org/YuE2](https://huggingface.co/Comfy-Org/YuE2)),
-restart, and open a workflow from `comfyui/.../workflows/`. Set `YUE2_HOME` if this checkout is not at
-`~/yue2-same-music-new-lyrics`.
+Put `yue2_3b_bf16.safetensors` from [Comfy-Org/YuE2](https://huggingface.co/Comfy-Org/YuE2) in
+`<ComfyUI>/models/checkpoints/`, restart ComfyUI, and open a workflow from `comfyui/.../workflows/`
+(also listed in ComfyUI's workflow sidebar once copied to `user/default/workflows/`). Set `YUE2_HOME` if this checkout
+is not at `~/yue2-same-music-new-lyrics`.
 
 ## Notes
 
