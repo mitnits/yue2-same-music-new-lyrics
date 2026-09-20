@@ -1,0 +1,1296 @@
+{
+ "id": "yue2-sml-same-melody-new-lyrics",
+ "revision": 0,
+ "last_node_id": 19,
+ "last_link_id": 22,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "MarkdownNote",
+   "pos": [
+    -1200,
+    -700
+   ],
+   "size": [
+    520,
+    330
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "title": "same melody, new lyrics",
+   "properties": {},
+   "widgets_values": [
+    "# Same melody, new lyrics\n\n1. **Load Audio**: pick the recording (press R after adding files to Downloads).\n2. **Transcribe** → score. The **Score Editor** box fills with it; edit there if you like and queue again (transcription is cached). Type `RESET` to reload.\n3. Paste **NEW LYRICS** (one `[Section]` per sung section, in order), set the **song language**, write the **style prompt** without a language tag.\n4. **TRANSPOSE** sliders: `vocal_octave -1` = singer one octave down (same notes); `key_shift` = whole song in another key. Both keep the harmony. Match the style prompt's voice type to the new range.\n5. Queue. mode `full` keeps the transcribed chords.\n\nOptional nodes in the `audio/yue2-same-music-new-lyrics` menu: Describe Track, Fix Voices, Separate Vocals, Strip Chords, Compare Scores."
+   ],
+   "color": "#432",
+   "bgcolor": "#653"
+  },
+  {
+   "id": 2,
+   "type": "Yue2SmlLoadAudioPath",
+   "pos": [
+    -600,
+    -700
+   ],
+   "size": [
+    420,
+    110
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "file",
+     "type": "COMBO",
+     "link": null,
+     "widget": {
+      "name": "file"
+     }
+    },
+    {
+     "name": "path",
+     "type": "STRING",
+     "link": null,
+     "widget": {
+      "name": "path"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "name": "audio",
+     "type": "AUDIO",
+     "links": [
+      1
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "Yue2SmlLoadAudioPath"
+   },
+   "widgets_values": [
+    "",
+    ""
+   ],
+   "title": "Load Audio (choose a file)"
+  },
+  {
+   "id": 3,
+   "type": "Yue2SmlTranscribe",
+   "pos": [
+    -120,
+    -700
+   ],
+   "size": [
+    380,
+    190
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "audio",
+     "type": "AUDIO",
+     "link": 1
+    },
+    {
+     "name": "melody_only",
+     "type": "BOOLEAN",
+     "link": null,
+     "widget": {
+      "name": "melody_only"
+     }
+    },
+    {
+     "name": "name",
+     "type": "STRING",
+     "link": null,
+     "widget": {
+      "name": "name"
+     }
+    },
+    {
+     "name": "melody_tracks",
+     "type": "COMBO",
+     "link": null,
+     "widget": {
+      "name": "melody_tracks"
+     }
+    },
+    {
+     "name": "isolate_vocals_first",
+     "type": "BOOLEAN",
+     "link": null,
+     "widget": {
+      "name": "isolate_vocals_first"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "name": "abc",
+     "type": "STRING",
+     "links": [
+      3
+     ]
+    },
+    {
+     "name": "facts_json",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "summary",
+     "type": "STRING",
+     "links": [
+      2
+     ]
+    },
+    {
+     "name": "folder",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "Yue2SmlTranscribe"
+   },
+   "widgets_values": [
+    false,
+    "my_song",
+    "vocal + instrument",
+    false
+   ]
+  },
+  {
+   "id": 4,
+   "type": "PreviewAny",
+   "pos": [
+    300,
+    -700
+   ],
+   "size": [
+    420,
+    190
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "source",
+     "type": "*",
+     "link": 2
+    }
+   ],
+   "outputs": [
+    {
+     "name": "STRING",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewAny"
+   },
+   "widgets_values": [],
+   "title": "Transcription summary"
+  },
+  {
+   "id": 5,
+   "type": "Yue2SmlScoreEditor",
+   "pos": [
+    -120,
+    -460
+   ],
+   "size": [
+    840,
+    440
+   ],
+   "flags": {},
+   "order": 5,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "edited_abc",
+     "type": "STRING",
+     "link": null,
+     "widget": {
+      "name": "edited_abc"
+     }
+    },
+    {
+     "name": "name",
+     "type": "STRING",
+     "link": null,
+     "widget": {
+      "name": "name"
+     }
+    },
+    {
+     "name": "autofilled_hash",
+     "type": "STRING",
+     "link": null,
+     "widget": {
+      "name": "autofilled_hash"
+     }
+    },
+    {
+     "name": "abc",
+     "type": "STRING",
+     "link": 3
+    }
+   ],
+   "outputs": [
+    {
+     "name": "abc",
+     "type": "STRING",
+     "links": [
+      21
+     ]
+    },
+    {
+     "name": "saved_path",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "source",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "Yue2SmlScoreEditor"
+   },
+   "widgets_values": [
+    "",
+    "edited_score",
+    ""
+   ],
+   "title": "SCORE EDITOR — edit here, then queue again"
+  },
+  {
+   "id": 6,
+   "type": "PrimitiveStringMultiline",
+   "pos": [
+    -600,
+    -540
+   ],
+   "size": [
+    420,
+    360
+   ],
+   "flags": {},
+   "order": 6,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "value",
+     "type": "STRING",
+     "link": null,
+     "widget": {
+      "name": "value"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "name": "STRING",
+     "type": "STRING",
+     "links": [
+      5,
+      10
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PrimitiveStringMultiline"
+   },
+   "widgets_values": [
+    "[Verse]\n...\n\n[Chorus]\n...\n\n(one [Section] per sung section of the score, in order)"
+   ],
+   "title": "NEW LYRICS"
+  },
+  {
+   "id": 7,
+   "type": "PrimitiveStringMultiline",
+   "pos": [
+    -600,
+    -140
+   ],
+   "size": [
+    420,
+    140
+   ],
+   "flags": {},
+   "order": 7,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "value",
+     "type": "STRING",
+     "link": null,
+     "widget": {
+      "name": "value"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "name": "STRING",
+     "type": "STRING",
+     "links": [
+      7
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PrimitiveStringMultiline"
+   },
+   "widgets_values": [
+    "post-punk, male baritone vocal, clean electric guitar, acoustic guitar, electric bass, drum machine beat, nostalgic, 91 BPM"
+   ],
+   "title": "STYLE PROMPT (no language tag)"
+  },
+  {
+   "id": 8,
+   "type": "Yue2SmlStyleLanguage",
+   "pos": [
+    -600,
+    40
+   ],
+   "size": [
+    420,
+    110
+   ],
+   "flags": {},
+   "order": 8,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "style",
+     "type": "STRING",
+     "link": 7,
+     "widget": {
+      "name": "style"
+     }
+    },
+    {
+     "name": "language",
+     "type": "COMBO",
+     "link": null,
+     "widget": {
+      "name": "language"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "name": "style",
+     "type": "STRING",
+     "links": [
+      9
+     ]
+    },
+    {
+     "name": "note",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "Yue2SmlStyleLanguage"
+   },
+   "widgets_values": [
+    "",
+    "English"
+   ],
+   "title": "SONG LANGUAGE"
+  },
+  {
+   "id": 9,
+   "type": "Yue2SmlLyricsFit",
+   "pos": [
+    -120,
+    20
+   ],
+   "size": [
+    380,
+    220
+   ],
+   "flags": {},
+   "order": 9,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "abc",
+     "type": "STRING",
+     "link": 4,
+     "widget": {
+      "name": "abc"
+     }
+    },
+    {
+     "name": "new_lyrics",
+     "type": "STRING",
+     "link": 5,
+     "widget": {
+      "name": "new_lyrics"
+     }
+    },
+    {
+     "name": "language",
+     "type": "COMBO",
+     "link": null,
+     "widget": {
+      "name": "language"
+     }
+    },
+    {
+     "name": "method",
+     "type": "COMBO",
+     "link": null,
+     "widget": {
+      "name": "method"
+     }
+    },
+    {
+     "name": "fail_on_mismatch",
+     "type": "BOOLEAN",
+     "link": null,
+     "widget": {
+      "name": "fail_on_mismatch"
+     }
+    },
+    {
+     "name": "original_lyrics",
+     "type": "STRING",
+     "link": null,
+     "widget": {
+      "name": "original_lyrics"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": [
+      6
+     ]
+    },
+    {
+     "name": "sections_match",
+     "type": "BOOLEAN",
+     "links": []
+    },
+    {
+     "name": "sung_notes",
+     "type": "INT",
+     "links": []
+    },
+    {
+     "name": "new_syllables",
+     "type": "INT",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "Yue2SmlLyricsFit"
+   },
+   "widgets_values": [
+    "",
+    "",
+    "English",
+    "auto",
+    false,
+    ""
+   ]
+  },
+  {
+   "id": 10,
+   "type": "PreviewAny",
+   "pos": [
+    300,
+    20
+   ],
+   "size": [
+    520,
+    240
+   ],
+   "flags": {},
+   "order": 10,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "source",
+     "type": "*",
+     "link": 6
+    }
+   ],
+   "outputs": [
+    {
+     "name": "STRING",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewAny"
+   },
+   "widgets_values": [],
+   "title": "Lyrics fit report"
+  },
+  {
+   "id": 11,
+   "type": "CheckpointLoaderSimple",
+   "pos": [
+    760,
+    -700
+   ],
+   "size": [
+    380,
+    100
+   ],
+   "flags": {},
+   "order": 11,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "ckpt_name",
+     "type": "COMBO",
+     "link": null,
+     "widget": {
+      "name": "ckpt_name"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "name": "MODEL",
+     "type": "MODEL",
+     "links": [
+      14
+     ]
+    },
+    {
+     "name": "CLIP",
+     "type": "CLIP",
+     "links": [
+      8
+     ]
+    },
+    {
+     "name": "VAE",
+     "type": "VAE",
+     "links": [
+      19
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CheckpointLoaderSimple"
+   },
+   "widgets_values": [
+    "yue2_3b_bf16.safetensors"
+   ]
+  },
+  {
+   "id": 12,
+   "type": "YuE2GenerateMusic",
+   "pos": [
+    760,
+    -560
+   ],
+   "size": [
+    420,
+    420
+   ],
+   "flags": {},
+   "order": 12,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 8
+    },
+    {
+     "name": "style",
+     "type": "STRING",
+     "link": 9,
+     "widget": {
+      "name": "style"
+     }
+    },
+    {
+     "name": "lyrics",
+     "type": "STRING",
+     "link": 10,
+     "widget": {
+      "name": "lyrics"
+     }
+    },
+    {
+     "name": "abc",
+     "type": "STRING",
+     "link": 11,
+     "widget": {
+      "name": "abc"
+     }
+    },
+    {
+     "name": "seed",
+     "type": "INT",
+     "link": null,
+     "widget": {
+      "name": "seed"
+     }
+    },
+    {
+     "name": "mode",
+     "type": "COMBO",
+     "link": null,
+     "widget": {
+      "name": "mode"
+     }
+    },
+    {
+     "name": "max_duration",
+     "type": "FLOAT",
+     "link": null,
+     "widget": {
+      "name": "max_duration"
+     }
+    },
+    {
+     "name": "temperature",
+     "type": "FLOAT",
+     "link": null,
+     "widget": {
+      "name": "temperature"
+     }
+    },
+    {
+     "name": "top_p",
+     "type": "FLOAT",
+     "link": null,
+     "widget": {
+      "name": "top_p"
+     }
+    },
+    {
+     "name": "top_k",
+     "type": "INT",
+     "link": null,
+     "widget": {
+      "name": "top_k"
+     }
+    },
+    {
+     "name": "repetition_penalty",
+     "type": "FLOAT",
+     "link": null,
+     "widget": {
+      "name": "repetition_penalty"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      13,
+      15
+     ]
+    },
+    {
+     "name": "seconds",
+     "type": "FLOAT",
+     "links": [
+      12
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "YuE2GenerateMusic"
+   },
+   "widgets_values": [
+    "",
+    "",
+    "",
+    831001,
+    "fixed",
+    "full",
+    360.0,
+    1.0,
+    0.95,
+    100,
+    1.2
+   ]
+  },
+  {
+   "id": 13,
+   "type": "EmptyYuE2LatentAudio",
+   "pos": [
+    760,
+    -100
+   ],
+   "size": [
+    320,
+    100
+   ],
+   "flags": {},
+   "order": 13,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "seconds",
+     "type": "FLOAT",
+     "link": 12,
+     "widget": {
+      "name": "seconds"
+     }
+    },
+    {
+     "name": "batch_size",
+     "type": "INT",
+     "link": null,
+     "widget": {
+      "name": "batch_size"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      17
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "EmptyYuE2LatentAudio"
+   },
+   "widgets_values": [
+    120.0,
+    1
+   ]
+  },
+  {
+   "id": 14,
+   "type": "ConditioningZeroOut",
+   "pos": [
+    760,
+    40
+   ],
+   "size": [
+    320,
+    60
+   ],
+   "flags": {},
+   "order": 14,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "conditioning",
+     "type": "CONDITIONING",
+     "link": 13
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      16
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "ConditioningZeroOut"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 15,
+   "type": "KSampler",
+   "pos": [
+    1240,
+    -700
+   ],
+   "size": [
+    380,
+    300
+   ],
+   "flags": {},
+   "order": 15,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 14
+    },
+    {
+     "name": "seed",
+     "type": "INT",
+     "link": null,
+     "widget": {
+      "name": "seed"
+     }
+    },
+    {
+     "name": "steps",
+     "type": "INT",
+     "link": null,
+     "widget": {
+      "name": "steps"
+     }
+    },
+    {
+     "name": "cfg",
+     "type": "FLOAT",
+     "link": null,
+     "widget": {
+      "name": "cfg"
+     }
+    },
+    {
+     "name": "sampler_name",
+     "type": "COMBO",
+     "link": null,
+     "widget": {
+      "name": "sampler_name"
+     }
+    },
+    {
+     "name": "scheduler",
+     "type": "COMBO",
+     "link": null,
+     "widget": {
+      "name": "scheduler"
+     }
+    },
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 15
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 16
+    },
+    {
+     "name": "latent_image",
+     "type": "LATENT",
+     "link": 17
+    },
+    {
+     "name": "denoise",
+     "type": "FLOAT",
+     "link": null,
+     "widget": {
+      "name": "denoise"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      18
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "KSampler"
+   },
+   "widgets_values": [
+    42,
+    "fixed",
+    32,
+    1.0,
+    "dpm_2",
+    "sgm_uniform",
+    1.0
+   ]
+  },
+  {
+   "id": 16,
+   "type": "VAEDecodeAudio",
+   "pos": [
+    1240,
+    -360
+   ],
+   "size": [
+    320,
+    80
+   ],
+   "flags": {},
+   "order": 16,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 18
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 19
+    }
+   ],
+   "outputs": [
+    {
+     "name": "AUDIO",
+     "type": "AUDIO",
+     "links": [
+      20
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEDecodeAudio"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 17,
+   "type": "SaveAudio",
+   "pos": [
+    1240,
+    -240
+   ],
+   "size": [
+    380,
+    140
+   ],
+   "flags": {},
+   "order": 17,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "audio",
+     "type": "AUDIO",
+     "link": 20
+    },
+    {
+     "name": "filename_prefix",
+     "type": "STRING",
+     "link": null,
+     "widget": {
+      "name": "filename_prefix"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "name": "audio",
+     "type": "AUDIO",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "SaveAudio"
+   },
+   "widgets_values": [
+    "audio/yue2_studio"
+   ]
+  },
+  {
+   "id": 18,
+   "type": "Yue2SmlTranspose",
+   "pos": [
+    -120,
+    0
+   ],
+   "size": [
+    420,
+    150
+   ],
+   "flags": {},
+   "order": 18,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "abc",
+     "type": "STRING",
+     "widget": {
+      "name": "abc"
+     },
+     "link": 21
+    },
+    {
+     "name": "key_shift",
+     "type": "INT",
+     "widget": {
+      "name": "key_shift"
+     },
+     "link": null
+    },
+    {
+     "name": "vocal_octave",
+     "type": "INT",
+     "widget": {
+      "name": "vocal_octave"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "abc",
+     "type": "STRING",
+     "links": [
+      4,
+      11
+     ]
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": [
+      22
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "Yue2SmlTranspose"
+   },
+   "widgets_values": [
+    "",
+    0,
+    0
+   ],
+   "title": "TRANSPOSE — key shift / vocal octave (0 = off)"
+  },
+  {
+   "id": 19,
+   "type": "PreviewAny",
+   "pos": [
+    320,
+    0
+   ],
+   "size": [
+    400,
+    110
+   ],
+   "flags": {},
+   "order": 19,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "source",
+     "type": "*",
+     "link": 22
+    }
+   ],
+   "outputs": [
+    {
+     "name": "STRING",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewAny"
+   },
+   "widgets_values": [],
+   "title": "Transpose report (vocal range)"
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   0,
+   3,
+   0,
+   "AUDIO"
+  ],
+  [
+   2,
+   3,
+   2,
+   4,
+   0,
+   "STRING"
+  ],
+  [
+   3,
+   3,
+   0,
+   5,
+   3,
+   "STRING"
+  ],
+  [
+   4,
+   18,
+   0,
+   9,
+   0,
+   "STRING"
+  ],
+  [
+   5,
+   6,
+   0,
+   9,
+   1,
+   "STRING"
+  ],
+  [
+   6,
+   9,
+   0,
+   10,
+   0,
+   "STRING"
+  ],
+  [
+   7,
+   7,
+   0,
+   8,
+   0,
+   "STRING"
+  ],
+  [
+   8,
+   11,
+   1,
+   12,
+   0,
+   "CLIP"
+  ],
+  [
+   9,
+   8,
+   0,
+   12,
+   1,
+   "STRING"
+  ],
+  [
+   10,
+   6,
+   0,
+   12,
+   2,
+   "STRING"
+  ],
+  [
+   11,
+   18,
+   0,
+   12,
+   3,
+   "STRING"
+  ],
+  [
+   12,
+   12,
+   1,
+   13,
+   0,
+   "FLOAT"
+  ],
+  [
+   13,
+   12,
+   0,
+   14,
+   0,
+   "CONDITIONING"
+  ],
+  [
+   14,
+   11,
+   0,
+   15,
+   0,
+   "MODEL"
+  ],
+  [
+   15,
+   12,
+   0,
+   15,
+   6,
+   "CONDITIONING"
+  ],
+  [
+   16,
+   14,
+   0,
+   15,
+   7,
+   "CONDITIONING"
+  ],
+  [
+   17,
+   13,
+   0,
+   15,
+   8,
+   "LATENT"
+  ],
+  [
+   18,
+   15,
+   0,
+   16,
+   0,
+   "LATENT"
+  ],
+  [
+   19,
+   11,
+   2,
+   16,
+   1,
+   "VAE"
+  ],
+  [
+   20,
+   16,
+   0,
+   17,
+   0,
+   "AUDIO"
+  ],
+  [
+   21,
+   5,
+   0,
+   18,
+   0,
+   "STRING"
+  ],
+  [
+   22,
+   18,
+   1,
+   19,
+   0,
+   "STRING"
+  ]
+ ],
+ "groups": [],
+ "config": {},
+ "extra": {},
+ "version": 0.4
+}

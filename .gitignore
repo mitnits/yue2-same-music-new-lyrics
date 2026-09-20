@@ -1,0 +1,9 @@
+# upstream clone, virtual environments and model weights (created by setup.sh)
+YuE/
+# generated songs, transcriptions, stems
+outputs/
+# runtime
+*.log
+__pycache__/
+*.pyc
+.venv*/
