@@ -23,7 +23,7 @@
    "title": "Stage 1",
    "properties": {},
    "widgets_values": [
-    "# Stage 1 · Transcribe & edit the score\n\n1. Pick the recording in **Load Audio** (press R after adding files to Downloads).\n2. **Transcribe Recording** → SheetSage2. If the singer ends up in the instrument track, set `melody_tracks` to **vocal only** and re-run, or un-mute **Fix Voices** (Ctrl+M) and pick a repair mode.\n3. **Score Editor**: on the first run its box fills with the score. Edit it right there (notes, chords, tempo `Q:`, section comments), then queue again: transcription is cached, only the editor and what follows re-run. Type `RESET` to reload the incoming score.\n4. The editor saves the score to `output/yue2_studio/edited_score.abc`. That file is what **Stage 2** loads, so you can also edit it in any text editor.\n\nRead **Score Facts** for tempo, key and sung notes per section before writing lyrics."
+    "# Stage 1 · Transcribe & edit the score\n\n1. Pick the recording in **Load Audio** (press R after adding files to Downloads).\n2. **Transcribe Recording** → SheetSage2.\n3. **Score Editor**: on the first run its box fills with the score. Edit it right there (notes, chords, tempo `Q:`, section comments), then queue again: transcription is cached, only the editor and what follows re-run. Type `RESET` to reload the incoming score.\n4. The editor saves the score to `output/yue2_studio/edited_score.abc`. That file is what **Stage 2** loads, so you can also edit it in any text editor.\n\nRead **Score Facts** for tempo, key and sung notes per section before writing lyrics."
    ],
    "color": "#432",
    "bgcolor": "#653"
@@ -87,7 +87,7 @@
    ],
    "size": [
     380,
-    160
+    130
    ],
    "flags": {},
    "order": 3,
@@ -113,14 +113,6 @@
      "widget": {
       "name": "name"
      }
-    },
-    {
-     "name": "melody_tracks",
-     "type": "COMBO",
-     "link": null,
-     "widget": {
-      "name": "melody_tracks"
-     }
     }
    ],
    "outputs": [
@@ -128,7 +120,6 @@
      "name": "abc",
      "type": "STRING",
      "links": [
-      3,
       5
      ]
     },
@@ -155,8 +146,7 @@
    },
    "widgets_values": [
     false,
-    "my_song",
-    "vocal + instrument"
+    "my_song"
    ]
   },
   {
@@ -192,95 +182,6 @@
    },
    "widgets_values": [],
    "title": "Transcription summary"
-  },
-  {
-   "id": 5,
-   "type": "Yue2SmlFixVoices",
-   "pos": [
-    -120,
-    -480
-   ],
-   "size": [
-    380,
-    110
-   ],
-   "flags": {},
-   "order": 5,
-   "mode": 2,
-   "inputs": [
-    {
-     "name": "abc",
-     "type": "STRING",
-     "link": 3,
-     "widget": {
-      "name": "abc"
-     }
-    },
-    {
-     "name": "mode",
-     "type": "COMBO",
-     "link": null,
-     "widget": {
-      "name": "mode"
-     }
-    }
-   ],
-   "outputs": [
-    {
-     "name": "abc",
-     "type": "STRING",
-     "links": []
-    },
-    {
-     "name": "report",
-     "type": "STRING",
-     "links": [
-      4
-     ]
-    }
-   ],
-   "properties": {
-    "Node name for S&R": "Yue2SmlFixVoices"
-   },
-   "widgets_values": [
-    "",
-    "merge_ins_into_vocal"
-   ],
-   "title": "Fix Voices (optional, muted)"
-  },
-  {
-   "id": 6,
-   "type": "PreviewAny",
-   "pos": [
-    300,
-    -480
-   ],
-   "size": [
-    420,
-    110
-   ],
-   "flags": {},
-   "order": 6,
-   "mode": 2,
-   "inputs": [
-    {
-     "name": "source",
-     "type": "*",
-     "link": 4
-    }
-   ],
-   "outputs": [
-    {
-     "name": "STRING",
-     "type": "STRING",
-     "links": []
-    }
-   ],
-   "properties": {
-    "Node name for S&R": "PreviewAny"
-   },
-   "widgets_values": [],
-   "title": "Fix Voices report"
   },
   {
    "id": 7,
@@ -465,22 +366,6 @@
    3,
    2,
    4,
-   0,
-   "STRING"
-  ],
-  [
-   3,
-   3,
-   0,
-   5,
-   0,
-   "STRING"
-  ],
-  [
-   4,
-   5,
-   1,
-   6,
    0,
    "STRING"
   ],

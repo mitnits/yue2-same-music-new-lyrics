@@ -7,8 +7,8 @@ then YuE2 renders that exact score with your lyrics, in your language, optionall
 It is a set of **ComfyUI custom nodes** (`comfyui/comfyui-yue2-same-music-new-lyrics`) around ComfyUI's built-in
 YuE2 nodes: transcribe, edit the score on the canvas, fit-check the lyrics, transpose, render. Example workflows included.
 
-Optional extras: a style-prompt drafter that listens to the recording (Audio Flamingo 3 + CLAP), voice-track repair,
-and a language-aware syllable fit check.
+Optional extras: a style-prompt drafter that listens to the recording (Audio Flamingo 3 + CLAP) and a language-aware
+syllable fit check.
 
 ## Install
 

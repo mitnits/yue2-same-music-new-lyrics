@@ -23,7 +23,7 @@
    "title": "same melody, new lyrics",
    "properties": {},
    "widgets_values": [
-    "# Same melody, new lyrics\n\n1. **Load Audio**: pick the recording (press R after adding files to Downloads).\n2. **Transcribe** → score. The **Score Editor** box fills with it; edit there if you like and queue again (transcription is cached). Type `RESET` to reload.\n3. Paste **NEW LYRICS** (one `[Section]` per sung section, in order), set the **song language**, write the **style prompt** without a language tag.\n4. **TRANSPOSE** sliders: `vocal_octave -1` = singer one octave down (same notes); `key_shift` = whole song in another key. Both keep the harmony. Match the style prompt's voice type to the new range.\n5. Queue. mode `full` keeps the transcribed chords.\n\nOptional nodes in the `audio/yue2-same-music-new-lyrics` menu: Describe Track, Fix Voices, Strip Chords, Compare Scores."
+    "# Same melody, new lyrics\n\n1. **Load Audio**: pick the recording (press R after adding files to Downloads).\n2. **Transcribe** → score. The **Score Editor** box fills with it; edit there if you like and queue again (transcription is cached). Type `RESET` to reload.\n3. Paste **NEW LYRICS** (one `[Section]` per sung section, in order), set the **song language**, write the **style prompt** without a language tag.\n4. **TRANSPOSE** sliders: `vocal_octave -1` = singer one octave down (same notes); `key_shift` = whole song in another key. Both keep the harmony. Match the style prompt's voice type to the new range.\n5. Queue. mode `full` keeps the transcribed chords.\n\nOptional nodes in the `audio/yue2-same-music-new-lyrics` menu: Describe Track, Strip Chords, Compare Scores."
    ],
    "color": "#432",
    "bgcolor": "#653"
@@ -87,7 +87,7 @@
    ],
    "size": [
     380,
-    160
+    130
    ],
    "flags": {},
    "order": 3,
@@ -112,14 +112,6 @@
      "link": null,
      "widget": {
       "name": "name"
-     }
-    },
-    {
-     "name": "melody_tracks",
-     "type": "COMBO",
-     "link": null,
-     "widget": {
-      "name": "melody_tracks"
      }
     }
    ],
@@ -154,8 +146,7 @@
    },
    "widgets_values": [
     false,
-    "my_song",
-    "vocal + instrument"
+    "my_song"
    ]
   },
   {

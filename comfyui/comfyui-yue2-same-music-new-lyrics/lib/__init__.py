@@ -10,4 +10,4 @@ for candidate in (_here, _home):
         if str(candidate) not in sys.path:
             sys.path.insert(0, str(candidate))
         break
-from yue2_studio_lib import abc_tools, fit, voices, transpose  # noqa: E402,F401
+from yue2_studio_lib import abc_tools, fit, transpose  # noqa: E402,F401

@@ -8,7 +8,7 @@ This pack adds what the Gradio UI does for the "same melody, new lyrics" and "so
   * Transcribe (full SheetSage2 release, via its own venv): ABC + section timeline + key/tempo facts
   * Describe Track (Audio Flamingo 3 + CLAP, own venv): a draft YuE2 style prompt from the recording
   * Lyrics Fit: syllables per lyric section vs sung notes per phrase in the score
-  * Score Facts / Strip Chords / Compare Scores: ABC utilities
+  * Score Facts / Strip Chords / Compare Scores / Transpose: ABC utilities
   * Load Audio (path) / Load Text (path): convenience loaders
 
 The two heavy tools run as subprocesses in the environments created under YUE2_HOME (default ~/yue2-same-music-new-lyrics),
@@ -32,7 +32,7 @@ import comfy.model_management
 import folder_paths
 from comfy_api.latest import ComfyExtension, io
 
-from .lib import abc_tools, fit, voices, transpose as transpose_lib
+from .lib import abc_tools, fit, transpose as transpose_lib
 
 STUDIO_HOME = Path(os.environ.get("YUE2_HOME", Path.home() / "yue2-same-music-new-lyrics")).expanduser()
 SHEETSAGE_PY = STUDIO_HOME / "YuE" / ".venv-sheetsage2" / "bin" / "python"
@@ -98,9 +98,6 @@ class Yue2SmlTranscribe(io.ComfyNode):
                 io.Boolean.Input("melody_only", default=False,
                                  tooltip="Drop chord symbols (then render with mode 'melody')."),
                 io.String.Input("name", default="song"),
-                io.Combo.Input("melody_tracks", options=["vocal + instrument", "vocal only"], default="vocal + instrument",
-                               tooltip="'vocal only' asks SheetSage2 for the sung melody alone (melody_vocal task). Use it "
-                                       "when the voice gets filed under the instrument track; Ins stays empty."),
             ],
             outputs=[
                 io.String.Output(display_name="abc"),
@@ -111,7 +108,7 @@ class Yue2SmlTranscribe(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, audio, melody_only, name, melody_tracks="vocal + instrument"):
+    def execute(cls, audio, melody_only, name):
         _require(SHEETSAGE_PY, "SheetSage2 environment")
         _require(SHEETSAGE_WORKER, "sheetsage_worker.py")
         out = _work_dir(f"transcribed_{re.sub(r'[^A-Za-z0-9_.-]+', '-', name) or 'song'}")
@@ -119,8 +116,6 @@ class Yue2SmlTranscribe(io.ComfyNode):
         cmd = [str(SHEETSAGE_PY), str(SHEETSAGE_WORKER), str(wav), "--output", str(out / "sheetsage")]
         if melody_only:
             cmd.append("--melody-only")
-        if melody_tracks == "vocal only":
-            cmd += ["--tasks", "melody-vocal"]
         report = _run_worker(cmd, out / "sheetsage.log")
         abc = (out / "sheetsage" / "score.abc").read_text(encoding="utf-8")
         (out / "score.abc").write_text(abc, encoding="utf-8")
@@ -268,7 +263,7 @@ class Yue2SmlScoreEditor(io.ComfyNode):
                          "downstream to output/yue2_studio/<name>.abc."),
             inputs=[
                 io.String.Input("abc", default="", multiline=True, optional=True, force_input=True,
-                                tooltip="Incoming score (from Transcribe, Fix Voices or Load Text)."),
+                                tooltip="Incoming score (from Transcribe or Load Text)."),
                 io.String.Input("edited_abc", default="", multiline=True,
                                 tooltip="Your editable copy. Auto-filled; edit it to override the incoming score."),
                 io.String.Input("name", default="edited_score"),
@@ -305,69 +300,6 @@ class Yue2SmlScoreEditor(io.ComfyNode):
         logging.info(f"[yue2-sml] Score Editor used the {source}; saved {path}")
         return io.NodeOutput(text, str(path), source,
                              ui={"text": (text,), "fill": (fill,), "hash": (digest(fill),)})
-
-
-class Yue2SmlFixVoices(io.ComfyNode):
-    @classmethod
-    def define_schema(cls):
-        return io.Schema(
-            node_id="Yue2SmlFixVoices",
-            display_name="Fix Voices (vocal filed as instrument)",
-            category=CATEGORY,
-            description=("Repairs a transcription whose sung melody landed in the Ins track. swap: exchange the two "
-                         "voices; merge_ins_into_vocal: where Vocal rests and Ins plays, sing the Ins line; "
-                         "vocal_only: silence Ins; ins_as_vocal: sing the Ins line, drop the old Vocal. Bar-level: "
-                         "chord symbols in changed bars move to the barline."),
-            inputs=[
-                io.String.Input("abc", multiline=True),
-                io.Combo.Input("mode", options=["merge_ins_into_vocal", "swap", "vocal_only", "ins_as_vocal"],
-                               default="merge_ins_into_vocal"),
-            ],
-            outputs=[io.String.Output(display_name="abc"), io.String.Output(display_name="report")],
-        )
-
-    @classmethod
-    def execute(cls, abc, mode):
-        new, notes = voices.transform(abc, mode)
-        before = abc_tools.parse_abc(abc); after = abc_tools.parse_abc(new)
-        rep = (f"{notes[0]} Vocal notes {len(before.voices['Vocal'].notes)} → {len(after.voices['Vocal'].notes)}, "
-               f"Ins notes {len(before.voices['Ins'].notes)} → {len(after.voices['Ins'].notes)}.")
-        return io.NodeOutput(new, rep)
-
-
-class Yue2SmlTranspose(io.ComfyNode):
-    @classmethod
-    def define_schema(cls):
-        return io.Schema(
-            node_id="Yue2SmlTranspose",
-            display_name="Transpose (key shift / vocal octave)",
-            category=CATEGORY,
-            description=("Two safe levers for a singer's range. key_shift moves the whole song (both voices, chords, key "
-                         "signature) by semitones, like playing it in another key. vocal_octave moves only the sung "
-                         "line by whole octaves (same notes, lower or higher register). Both keep the harmony intact. "
-                         "The report shows the vocal range before and after; update the style prompt's voice "
-                         "description (e.g. baritone vs tenor) to match."),
-            inputs=[
-                io.String.Input("abc", multiline=True),
-                io.Int.Input("key_shift", default=0, min=-11, max=11, display_mode=io.NumberDisplay.slider,
-                             tooltip="Semitones for the whole song: -2 = two semitones lower (a whole tone)."),
-                io.Int.Input("vocal_octave", default=0, min=-2, max=2, display_mode=io.NumberDisplay.slider,
-                             tooltip="Octaves for the sung line only: -1 = the singer one octave down."),
-            ],
-            outputs=[io.String.Output(display_name="abc"), io.String.Output(display_name="report")],
-        )
-
-    @classmethod
-    def execute(cls, abc, key_shift, vocal_octave):
-        new, info = transpose_lib.transpose(abc, key_shift, vocal_octave)
-        if not info.get("changed"):
-            rng = transpose_lib.vocal_range(abc)
-            return io.NodeOutput(abc, f"No transposition. Vocal range {rng}; {transpose_lib.voice_type_hint(abc)}.")
-        rep = (f"Key {info['key']} (shift {info['key_shift']:+d} semitones), vocal octave {info['vocal_octave']:+d}. "
-               f"Vocal range {info['vocal_range_before']} → {info['vocal_range_after']}; "
-               f"{transpose_lib.voice_type_hint(new)}.")
-        logging.info("[yue2-sml] " + rep)
-        return io.NodeOutput(new, rep)
 
 
 class Yue2SmlScoreFacts(io.ComfyNode):
@@ -566,7 +498,7 @@ class Yue2SmlExtension(ComfyExtension):
     @override
     async def get_node_list(self):
         return [Yue2SmlTranscribe, Yue2SmlScoreEditor, Yue2SmlTranspose,
-                Yue2SmlFixVoices, Yue2SmlDescribe,
+                Yue2SmlDescribe,
                 Yue2SmlLyricsFit, Yue2SmlScoreFacts, Yue2SmlStripChords, Yue2SmlCompareScores,
                 Yue2SmlStyleLanguage, Yue2SmlLoadAudioPath, Yue2SmlLoadText]
 

@@ -36,9 +36,6 @@ def main():
     parser.add_argument("--device", default="auto")
     parser.add_argument("--dtype", choices=("bf16", "fp32"), default=None)
     parser.add_argument("--max-seconds", type=float)
-    parser.add_argument("--tasks", choices=("default", "melody-vocal"), default="default",
-                        help="default = vocal + instrumental melodies (melody_full); melody-vocal = ask only for the "
-                             "sung melody (melody_vocal), useful when the voice gets filed as an instrument")
     args = parser.parse_args()
 
     import torch
@@ -48,8 +45,6 @@ def main():
     dtype = args.dtype or ("bf16" if device == "cuda" else "fp32")
     args.output.mkdir(parents=True, exist_ok=True)
     kwargs = dict(output_dir=str(args.output), dtype=dtype, melody_only=args.melody_only)
-    if args.tasks == "melody-vocal":
-        kwargs["prompts"] = ("timestamp", "downbeat_meter", "structure", "key", "chord_full", "melody_vocal")
     if args.max_seconds:
         kwargs["max_seconds"] = args.max_seconds
 
