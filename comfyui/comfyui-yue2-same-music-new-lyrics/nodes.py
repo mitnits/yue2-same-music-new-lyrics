@@ -302,6 +302,41 @@ class Yue2SmlScoreEditor(io.ComfyNode):
                              ui={"text": (text,), "fill": (fill,), "hash": (digest(fill),)})
 
 
+class Yue2SmlTranspose(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="Yue2SmlTranspose",
+            display_name="Transpose (key shift / vocal octave)",
+            category=CATEGORY,
+            description=("Two safe levers for a singer's range. key_shift moves the whole song (both voices, chords, key "
+                         "signature) by semitones, like playing it in another key. vocal_octave moves only the sung "
+                         "line by whole octaves (same notes, lower or higher register). Both keep the harmony intact. "
+                         "The report shows the vocal range before and after; update the style prompt's voice "
+                         "description (e.g. baritone vs tenor) to match."),
+            inputs=[
+                io.String.Input("abc", multiline=True),
+                io.Int.Input("key_shift", default=0, min=-11, max=11, display_mode=io.NumberDisplay.slider,
+                             tooltip="Semitones for the whole song: -2 = two semitones lower (a whole tone)."),
+                io.Int.Input("vocal_octave", default=0, min=-2, max=2, display_mode=io.NumberDisplay.slider,
+                             tooltip="Octaves for the sung line only: -1 = the singer one octave down."),
+            ],
+            outputs=[io.String.Output(display_name="abc"), io.String.Output(display_name="report")],
+        )
+
+    @classmethod
+    def execute(cls, abc, key_shift, vocal_octave):
+        new, info = transpose_lib.transpose(abc, key_shift, vocal_octave)
+        if not info.get("changed"):
+            rng = transpose_lib.vocal_range(abc)
+            return io.NodeOutput(abc, f"No transposition. Vocal range {rng}; {transpose_lib.voice_type_hint(abc)}.")
+        rep = (f"Key {info['key']} (shift {info['key_shift']:+d} semitones), vocal octave {info['vocal_octave']:+d}. "
+               f"Vocal range {info['vocal_range_before']} → {info['vocal_range_after']}; "
+               f"{transpose_lib.voice_type_hint(new)}.")
+        logging.info("[yue2-sml] " + rep)
+        return io.NodeOutput(new, rep)
+
+
 class Yue2SmlScoreFacts(io.ComfyNode):
     @classmethod
     def define_schema(cls):
