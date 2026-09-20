@@ -1,4 +1,4 @@
-"""Lyrics-fit and ABC helpers shared by the Gradio UI (yue2_ui.py) and the ComfyUI pack.
+"""Lyrics-fit and ABC helpers for the ComfyUI pack.
 
 Language handling
 -----------------
