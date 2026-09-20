@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-shot setup: SheetSage2 (required by the Transcribe node), and with --extras Audio Flamingo 3 + CLAP + Demucs.
+# One-shot setup: SheetSage2 (required by the Transcribe node), and with --extras Audio Flamingo 3 + CLAP.
 # YuE2 itself runs inside ComfyUI (yue2_3b_bf16.safetensors from Comfy-Org/YuE2 in models/checkpoints).
 # Tested on Debian 13, RTX 5090, uv 0.11. Re-running is safe: existing environments and downloads are reused.
 set -euo pipefail
@@ -22,9 +22,9 @@ REV=$(python3 -c "import json;print(json.load(open('YuE/models/SheetSage2/config
 $HF download m-a-p/MERT-v2-FullSong --revision "$REV" >/dev/null
 
 if [ "$EXTRAS" = 1 ]; then
-  echo "== Extras: Audio Flamingo 3 + CLAP (style prompt drafter), Demucs (vocal separation)"
+  echo "== Extras: Audio Flamingo 3 + CLAP (style prompt drafter)"
   [ -x YuE/.venv-describe/bin/python ] || uv venv --python 3.12 YuE/.venv-describe
-  uv pip install --python YuE/.venv-describe/bin/python "torch==2.10.0" "transformers>=4.57" accelerate soundfile librosa numpy demucs
+  uv pip install --python YuE/.venv-describe/bin/python "torch==2.10.0" "transformers>=4.57" accelerate soundfile librosa numpy
   [ -f YuE/models/audio-flamingo-3-hf/config.json ] || $HF download nvidia/audio-flamingo-3-hf --local-dir YuE/models/audio-flamingo-3-hf
   [ -f YuE/models/clap-music/config.json ] || $HF download laion/larger_clap_music_and_speech --local-dir YuE/models/clap-music
 fi

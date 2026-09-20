@@ -9,7 +9,6 @@ Nodes (category `audio/yue2-same-music-new-lyrics`):
 | Node | What it does |
 |---|---|
 | Transcribe Recording (SheetSage2 full) | Full SheetSage2 release in its own venv: ABC with section comments, chords, key, tempo + timeline, MIDI, annotations. `melody_tracks = vocal only` asks for the sung melody alone |
-| Separate Vocals (Demucs) | Vocal stem + accompaniment stem (htdemucs); reports seconds of singing. Transcribe's `isolate_vocals_first` uses it to transcribe a vocal-forward remix so the singer cannot be filed as an instrument |
 | Score Editor | The pause between transcribing and rendering: the box fills with the incoming score on first run, you edit it on the canvas and queue again (upstream is cached). Saves the score to `output/yue2_studio/<name>.abc`. `RESET` reloads |
 | Transpose | Two range levers: key_shift (whole song, semitones) and vocal_octave (sung line only, octaves); reports the vocal range before/after |
 | Fix Voices | Repairs a transcription whose singer landed in the Ins track: merge_ins_into_vocal / swap / vocal_only / ins_as_vocal |

@@ -7,8 +7,8 @@ then YuE2 renders that exact score with your lyrics, in your language, optionall
 It is a set of **ComfyUI custom nodes** (`comfyui/comfyui-yue2-same-music-new-lyrics`) around ComfyUI's built-in
 YuE2 nodes: transcribe, edit the score on the canvas, fit-check the lyrics, transpose, render. Example workflows included.
 
-Optional extras: a style-prompt drafter that listens to the recording (Audio Flamingo 3 + CLAP), vocal/accompaniment
-separation (Demucs), voice-track repair, and a language-aware syllable fit check.
+Optional extras: a style-prompt drafter that listens to the recording (Audio Flamingo 3 + CLAP), voice-track repair,
+and a language-aware syllable fit check.
 
 ## Install
 
@@ -19,7 +19,7 @@ Linux, NVIDIA GPU (24 GB VRAM for the full-quality preset), [ComfyUI](https://gi
 git clone https://github.com/mitnits/yue2-same-music-new-lyrics ~/yue2-same-music-new-lyrics
 cd ~/yue2-same-music-new-lyrics
 ./setup.sh            # SheetSage2 environment and weights (~4 GB)
-./setup.sh --extras   # also Audio Flamingo 3, CLAP, Demucs (~37 GB more)
+./setup.sh --extras   # also Audio Flamingo 3 + CLAP (~37 GB more)
 ln -s ~/yue2-same-music-new-lyrics/comfyui/comfyui-yue2-same-music-new-lyrics <ComfyUI>/custom_nodes/
 ```
 

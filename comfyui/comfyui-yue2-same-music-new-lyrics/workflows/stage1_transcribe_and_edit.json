@@ -23,7 +23,7 @@
    "title": "Stage 1",
    "properties": {},
    "widgets_values": [
-    "# Stage 1 · Transcribe & edit the score\n\n1. Pick the recording in **Load Audio** (press R after adding files to Downloads).\n2. **Transcribe Recording** → SheetSage2. If the singer ends up in the instrument track, tick **isolate_vocals_first** (Demucs separates the singer, then SheetSage2 hears a vocal-forward mix) and re-run; the summary also tells you how many seconds of singing the recording has — an instrumental version shows 0, or un-mute **Fix Voices** (Ctrl+M) and pick a repair mode.\n3. **Score Editor**: on the first run its box fills with the score. Edit it right there (notes, chords, tempo `Q:`, section comments), then queue again: transcription is cached, only the editor and what follows re-run. Type `RESET` to reload the incoming score.\n4. The editor saves the score to `output/yue2_studio/edited_score.abc`. That file is what **Stage 2** loads, so you can also edit it in any text editor.\n\nRead **Score Facts** for tempo, key and sung notes per section before writing lyrics."
+    "# Stage 1 · Transcribe & edit the score\n\n1. Pick the recording in **Load Audio** (press R after adding files to Downloads).\n2. **Transcribe Recording** → SheetSage2. If the singer ends up in the instrument track, set `melody_tracks` to **vocal only** and re-run, or un-mute **Fix Voices** (Ctrl+M) and pick a repair mode.\n3. **Score Editor**: on the first run its box fills with the score. Edit it right there (notes, chords, tempo `Q:`, section comments), then queue again: transcription is cached, only the editor and what follows re-run. Type `RESET` to reload the incoming score.\n4. The editor saves the score to `output/yue2_studio/edited_score.abc`. That file is what **Stage 2** loads, so you can also edit it in any text editor.\n\nRead **Score Facts** for tempo, key and sung notes per section before writing lyrics."
    ],
    "color": "#432",
    "bgcolor": "#653"
@@ -87,7 +87,7 @@
    ],
    "size": [
     380,
-    190
+    160
    ],
    "flags": {},
    "order": 3,
@@ -121,14 +121,6 @@
      "widget": {
       "name": "melody_tracks"
      }
-    },
-    {
-     "name": "isolate_vocals_first",
-     "type": "BOOLEAN",
-     "widget": {
-      "name": "isolate_vocals_first"
-     },
-     "link": null
     }
    ],
    "outputs": [
@@ -164,8 +156,7 @@
    "widgets_values": [
     false,
     "my_song",
-    "vocal + instrument",
-    false
+    "vocal + instrument"
    ]
   },
   {

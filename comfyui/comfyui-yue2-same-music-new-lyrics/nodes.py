@@ -39,7 +39,6 @@ SHEETSAGE_PY = STUDIO_HOME / "YuE" / ".venv-sheetsage2" / "bin" / "python"
 SHEETSAGE_WORKER = STUDIO_HOME / "sheetsage_worker.py"
 DESCRIBE_PY = STUDIO_HOME / "YuE" / ".venv-describe" / "bin" / "python"
 DESCRIBE_WORKER = STUDIO_HOME / "describe_worker.py"
-SEPARATE_WORKER = STUDIO_HOME / "separate_worker.py"  # Demucs, runs in the describe venv
 CATEGORY = "audio/yue2-same-music-new-lyrics"
 
 
@@ -76,20 +75,6 @@ def _run_worker(cmd: list[str], log_path: Path) -> dict:
     return report
 
 
-def _read_audio_file(path: Path) -> dict:
-    import soundfile as sf
-    data, sr = sf.read(str(path), dtype="float32", always_2d=True)
-    return {"waveform": torch.from_numpy(data.T.copy()).unsqueeze(0), "sample_rate": int(sr)}
-
-
-def _separate(wav: Path, out: Path, model: str = "htdemucs", shifts: int = 1) -> dict:
-    _require(DESCRIBE_PY, "Describer/Demucs environment")
-    _require(SEPARATE_WORKER, "separate_worker.py")
-    cmd = [str(DESCRIBE_PY), str(SEPARATE_WORKER), str(wav), "--output", str(out), "--model", model,
-           "--shifts", str(shifts)]
-    return _run_worker(cmd, out / "separate.log")
-
-
 def _require(path: Path, what: str):
     if not path.exists():
         raise RuntimeError(f"{what} not found at {path}. Set YUE2_HOME to the folder that holds the "
@@ -116,11 +101,6 @@ class Yue2SmlTranscribe(io.ComfyNode):
                 io.Combo.Input("melody_tracks", options=["vocal + instrument", "vocal only"], default="vocal + instrument",
                                tooltip="'vocal only' asks SheetSage2 for the sung melody alone (melody_vocal task). Use it "
                                        "when the voice gets filed under the instrument track; Ins stays empty."),
-                io.Boolean.Input("isolate_vocals_first", default=False,
-                                 tooltip="Run Demucs first and transcribe the isolated vocal stem (chords/structure are "
-                                         "still taken from the full mix). Whatever SheetSage2 hears in that stem becomes "
-                                         "the Vocal voice. Fixes 'the singer was filed as an instrument'; also reports "
-                                         "how many seconds of singing the recording has."),
             ],
             outputs=[
                 io.String.Output(display_name="abc"),
@@ -131,44 +111,18 @@ class Yue2SmlTranscribe(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, audio, melody_only, name, melody_tracks="vocal + instrument", isolate_vocals_first=False):
+    def execute(cls, audio, melody_only, name, melody_tracks="vocal + instrument"):
         _require(SHEETSAGE_PY, "SheetSage2 environment")
         _require(SHEETSAGE_WORKER, "sheetsage_worker.py")
         out = _work_dir(f"transcribed_{re.sub(r'[^A-Za-z0-9_.-]+', '-', name) or 'song'}")
         wav = _write_audio(audio, out / "audio.flac")
-        sep_note = ""
-        if isolate_vocals_first:
-            # Demucs, then transcribe a vocal-forward remix (vocals at full level, accompaniment at -12 dB) ONCE, so
-            # chords/structure still come from the band while the singer is unmistakably the lead line.
-            sep = _separate(wav, out / "stems")
-            sep_note = f" Demucs: {sep['seconds_with_vocals']} of {sep['seconds_total']} s contain singing."
-            if sep["seconds_with_vocals"] < 5:
-                sep_note += " ⚠ Almost no vocals detected: this recording looks instrumental."
-            import soundfile as sf
-            v, sr = sf.read(sep["vocals"], dtype="float32", always_2d=True)
-            r, _ = sf.read(sep["no_vocals"], dtype="float32", always_2d=True)
-            n = min(len(v), len(r))
-            mix = v[:n] + 0.25 * r[:n]
-            peak = float(abs(mix).max()) or 1.0
-            sf.write(str(out / "vocal_forward_mix.flac"), mix / max(peak, 1.0), sr, subtype="PCM_24")
-            cmd = [str(SHEETSAGE_PY), str(SHEETSAGE_WORKER), str(out / "vocal_forward_mix.flac"), "--output",
-                   str(out / "sheetsage")]
-            if melody_only:
-                cmd.append("--melody-only")
-            report = _run_worker(cmd, out / "sheetsage.log")
-            abc = (out / "sheetsage" / "score.abc").read_text(encoding="utf-8")
-            sc = abc_tools.parse_abc(abc)
-            if not sc.voices["Vocal"].notes and sc.voices["Ins"].notes:
-                abc, notes = voices.transform(abc, "ins_as_vocal")
-                sep_note += " The stem's melody was filed under Ins; moved it to Vocal (" + notes[0] + ")"
-        else:
-            cmd = [str(SHEETSAGE_PY), str(SHEETSAGE_WORKER), str(wav), "--output", str(out / "sheetsage")]
-            if melody_only:
-                cmd.append("--melody-only")
-            if melody_tracks == "vocal only":
-                cmd += ["--tasks", "melody-vocal"]
-            report = _run_worker(cmd, out / "sheetsage.log")
-            abc = (out / "sheetsage" / "score.abc").read_text(encoding="utf-8")
+        cmd = [str(SHEETSAGE_PY), str(SHEETSAGE_WORKER), str(wav), "--output", str(out / "sheetsage")]
+        if melody_only:
+            cmd.append("--melody-only")
+        if melody_tracks == "vocal only":
+            cmd += ["--tasks", "melody-vocal"]
+        report = _run_worker(cmd, out / "sheetsage.log")
+        abc = (out / "sheetsage" / "score.abc").read_text(encoding="utf-8")
         (out / "score.abc").write_text(abc, encoding="utf-8")
         facts = fit.score_facts(abc, str(out / "sheetsage" / "structure.lab"))
         phrases = fit.vocal_phrases_per_section(abc)
@@ -180,7 +134,7 @@ class Yue2SmlTranscribe(io.ComfyNode):
         summary = (f"SheetSage2 ({report.get('device')}, {report.get('total_seconds')} s): {valid}. "
                    + "; ".join(f"{k}: {v}" for k, v in facts.items() if k != "structure") + ". Sung sections: "
                    + ", ".join(f"{s} {sum(p)} notes ({'/'.join(map(str, p))})" for s, p in phrases)
-                   + (f". Warnings: {report.get('warnings')}" if report.get("warnings") else "") + sep_note)
+                   + (f". Warnings: {report.get('warnings')}" if report.get("warnings") else ""))
         return io.NodeOutput(abc, json.dumps(facts, ensure_ascii=False), summary, str(out))
 
 
@@ -298,36 +252,6 @@ class Yue2SmlLyricsFit(io.ComfyNode):
             logging.info(f"[yue2-sml] Lyrics Fit Check: {len(sung)} sections match; "
                          f"{sum(sum(p) for _, p in sung)} sung notes vs {sum(x[2] for x in new)} syllables.")
         return io.NodeOutput(report, match, sum(sum(p) for _, p in sung), sum(x[2] for x in new))
-
-
-class Yue2SmlSeparateVocals(io.ComfyNode):
-    @classmethod
-    def define_schema(cls):
-        return io.Schema(
-            node_id="Yue2SmlSeparateVocals",
-            display_name="Separate Vocals (Demucs)",
-            category=CATEGORY,
-            description=("Splits a recording into the vocal stem and the accompaniment (htdemucs). Use the vocal stem "
-                         "for transcription checks, and the accompaniment as the backing track when laying a generated "
-                         "vocal over the original music."),
-            inputs=[
-                io.Audio.Input("audio"),
-                io.Combo.Input("model", options=["htdemucs", "htdemucs_ft"], default="htdemucs",
-                               tooltip="htdemucs_ft is slower and a little cleaner (downloads ~320 MB on first use)."),
-                io.Int.Input("shifts", default=1, min=1, max=5, tooltip="More passes = cleaner stems, slower."),
-            ],
-            outputs=[io.Audio.Output(display_name="vocals"), io.Audio.Output(display_name="accompaniment"),
-                     io.String.Output(display_name="report")],
-        )
-
-    @classmethod
-    def execute(cls, audio, model, shifts):
-        out = _work_dir("stems")
-        wav = _write_audio(audio, out / "audio.flac")
-        sep = _separate(wav, out, model=model, shifts=shifts)
-        rep = (f"Demucs {model}: {sep['seconds_with_vocals']} of {sep['seconds_total']} s contain singing; "
-               f"stems in {out}." + (" ⚠ Almost no vocals detected." if sep["seconds_with_vocals"] < 5 else ""))
-        return io.NodeOutput(_read_audio_file(Path(sep["vocals"])), _read_audio_file(Path(sep["no_vocals"])), rep)
 
 
 class Yue2SmlScoreEditor(io.ComfyNode):
@@ -641,7 +565,7 @@ class Yue2SmlLoadText(io.ComfyNode):
 class Yue2SmlExtension(ComfyExtension):
     @override
     async def get_node_list(self):
-        return [Yue2SmlTranscribe, Yue2SmlSeparateVocals, Yue2SmlScoreEditor, Yue2SmlTranspose,
+        return [Yue2SmlTranscribe, Yue2SmlScoreEditor, Yue2SmlTranspose,
                 Yue2SmlFixVoices, Yue2SmlDescribe,
                 Yue2SmlLyricsFit, Yue2SmlScoreFacts, Yue2SmlStripChords, Yue2SmlCompareScores,
                 Yue2SmlStyleLanguage, Yue2SmlLoadAudioPath, Yue2SmlLoadText]
