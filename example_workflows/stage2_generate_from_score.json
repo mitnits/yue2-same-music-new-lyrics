@@ -23,7 +23,7 @@
    "title": "Stage 2",
    "properties": {},
    "widgets_values": [
-    "# Stage 2 · Generate from the edited score\n\n1. **Load Text File** reads `output/yue2_studio/edited_score.abc` written by Stage 1 (or point it at any `.abc`).\n2. A second **Score Editor** lets you tweak the score once more on this canvas (empty = pass through; it saves to `..._stage2.abc`).\n3. Paste the **new lyrics** (one `[Section]` per sung section, in order), pick the **song language**, write the **style prompt**. Section mismatches are logged unless `fail_on_mismatch` is on.\n4. Queue. mode `full` keeps the chords from the score; use **Strip Chords** + mode `melody` to let YuE2 re-harmonize.\n\nKSampler: 32 steps, cfg 1, dpm_2 / sgm_uniform. Model: `checkpoints/yue2_3b_bf16.safetensors`."
+    "# Stage 2 · Generate from the edited score\n\n1. **Load Text File** reads `output/yue2-same-music-new-lyrics/edited_score.abc` written by Stage 1 (or point it at any `.abc`).\n2. A second **Score Editor** lets you tweak the score once more on this canvas (empty = pass through; it saves to `..._stage2.abc`).\n3. Paste the **new lyrics** (one `[Section]` per sung section, in order), pick the **song language**, write the **style prompt**. Section mismatches are logged unless `fail_on_mismatch` is on.\n4. Queue. mode `full` keeps the chords from the score; use **Strip Chords** + mode `melody` to let YuE2 re-harmonize.\n\nKSampler: 32 steps, cfg 1, dpm_2 / sgm_uniform. Model: `checkpoints/yue2_3b_bf16.safetensors`."
    ],
    "color": "#432",
    "bgcolor": "#653"
@@ -65,7 +65,7 @@
     "Node name for S&R": "Yue2SmlLoadText"
    },
    "widgets_values": [
-    "yue2_studio/edited_score.abc"
+    "yue2-same-music-new-lyrics/edited_score.abc"
    ],
    "title": "Load score.abc from Stage 1"
   },
@@ -911,7 +911,7 @@
     "Node name for S&R": "SaveAudio"
    },
    "widgets_values": [
-    "audio/yue2_studio"
+    "audio/yue2-same-music-new-lyrics"
    ]
   }
  ],

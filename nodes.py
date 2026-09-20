@@ -4,7 +4,7 @@ Native ComfyUI already provides: CheckpointLoaderSimple (yue2_3b_*.safetensors),
 YuE2GenerateMusic (accepts an ABC score), EmptyYuE2LatentAudio, KSampler, VAEDecodeAudio,
 AudioEncoderLoader + SheetSage2AudioToABC (transcription).
 
-This pack adds what the Gradio UI does for the "same melody, new lyrics" and "song from anywhere" flows:
+This pack adds the "same melody, new lyrics" and "song from anywhere" flows:
   * Transcribe (full SheetSage2 release, via its own venv): ABC + section timeline + key/tempo facts
   * Describe Track (Audio Flamingo 3 + CLAP, own venv): a draft YuE2 style prompt from the recording
   * Lyrics Fit: syllables per lyric section vs sung notes per phrase in the score
@@ -46,7 +46,7 @@ CATEGORY = "audio/yue2-same-music-new-lyrics"
 
 # ----------------------------------------------------------------------------- helpers
 def _work_dir(prefix: str) -> Path:
-    base = Path(folder_paths.get_output_directory()) / "yue2_studio"
+    base = Path(folder_paths.get_output_directory()) / "yue2-same-music-new-lyrics"
     base.mkdir(parents=True, exist_ok=True)
     d = base / f"{dt.datetime.now().strftime('%Y%m%d-%H%M%S')}_{prefix}"
     d.mkdir(parents=True, exist_ok=True)
@@ -93,7 +93,7 @@ class Yue2SmlTranscribe(io.ComfyNode):
             category=CATEGORY,
             description=("Runs the full SheetSage2 release in its own environment: ABC score with section comments, "
                          "chords, key, tempo, plus a section timeline and MIDI/annotation files saved under "
-                         "output/yue2_studio. Use ComfyUI's native 'SheetSage2 Audio to ABC' for a lighter, in-process "
+                         "output/yue2-same-music-new-lyrics. Use ComfyUI's native 'SheetSage2 Audio to ABC' for a lighter, in-process "
                          "transcription."),
             inputs=[
                 io.Audio.Input("audio"),
@@ -262,7 +262,7 @@ class Yue2SmlScoreEditor(io.ComfyNode):
                          "refreshes whenever a NEW score arrives, as long as you have not edited it. Once you edit "
                          "the box, your text is what flows downstream (queue again; upstream nodes are cached). "
                          "Type RESET or clear the box to go back to the incoming score. Saves the score that went "
-                         "downstream to output/yue2_studio/<name>.abc."),
+                         "downstream to output/yue2-same-music-new-lyrics/<name>.abc."),
             inputs=[
                 io.String.Input("abc", default="", multiline=True, optional=True, force_input=True,
                                 tooltip="Incoming score (from Transcribe or Load Text)."),
@@ -295,7 +295,7 @@ class Yue2SmlScoreEditor(io.ComfyNode):
             abc_tools.parse_abc(text)
         except Exception as exc:
             raise RuntimeError(f"Score Editor: the score is not valid YuE2-native ABC: {exc}")
-        base = Path(folder_paths.get_output_directory()) / "yue2_studio"
+        base = Path(folder_paths.get_output_directory()) / "yue2-same-music-new-lyrics"
         base.mkdir(parents=True, exist_ok=True)
         path = base / f"{re.sub(r'[^A-Za-z0-9_.-]+', '-', name) or 'edited_score'}.abc"
         path.write_text(text, encoding="utf-8")
@@ -516,7 +516,7 @@ class Yue2SmlLoadText(io.ComfyNode):
             node_id="Yue2SmlLoadText",
             display_name="Load Text File (lyrics / ABC)",
             category=CATEGORY,
-            inputs=[io.String.Input("path", default="yue2_studio/edited_score.abc",
+            inputs=[io.String.Input("path", default="yue2-same-music-new-lyrics/edited_score.abc",
                                     tooltip="Absolute path, or relative to ComfyUI/output.")],
             outputs=[io.String.Output(display_name="text")],
         )
@@ -525,7 +525,7 @@ class Yue2SmlLoadText(io.ComfyNode):
     def execute(cls, path):
         p = Path(path).expanduser()
         if not p.is_absolute():
-            p = Path(folder_paths.get_output_directory()) / p  # e.g. yue2_studio/edited_score.abc
+            p = Path(folder_paths.get_output_directory()) / p  # e.g. yue2-same-music-new-lyrics/edited_score.abc
         if not p.is_file():
             raise RuntimeError(f"No such file: {p}")
         return io.NodeOutput(p.read_text(encoding="utf-8"))
