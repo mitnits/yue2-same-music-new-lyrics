@@ -1,4 +1,4 @@
-# comfyui-yue2-same-music-new-lyrics
+# Node reference
 
 Custom nodes that add the "song from anywhere → same melody, new lyrics" workflow pieces around ComfyUI's
 built-in YuE2 nodes (CheckpointLoaderSimple + YuE2GenerateABC / YuE2GenerateMusic / EmptyYuE2LatentAudio /
@@ -19,14 +19,13 @@ Nodes (category `audio/yue2-same-music-new-lyrics`):
 | Compare Scores | Exact symbolic melody/rhythm check between two scores |
 | Load Audio (file chooser), Load Text File | Dropdown of audio files in ComfyUI/input, ~/Downloads, ~/Music (or any path); text loader |
 
-The heavy nodes call the worker scripts and virtual environments created under `~/yue2-same-music-new-lyrics`
-(`sheetsage_worker.py` + `YuE/.venv-sheetsage2`, `describe_worker.py` + `YuE/.venv-describe`).
-Point `YUE2_HOME` at that folder if it lives elsewhere.
+The heavy nodes run `workers/*.py` in the environments that `setup.sh` creates under `runtime/`
+(`runtime/.venv-sheetsage2`, `runtime/.venv-describe`, weights in `runtime/models/`). Set `YUE2_RUNTIME` to relocate.
 
 Models for the native nodes (from https://huggingface.co/Comfy-Org/YuE2):
 `models/checkpoints/yue2_3b_bf16.safetensors` (or the int8 variant) and `models/audio_encoders/sheetsage2_bf16.safetensors`.
 
-Example workflows in `workflows/` (also installed in the ComfyUI workflow list):
+Example workflows are in `example_workflows/` (ComfyUI lists them under Templates → custom nodes).
 
 * `stage1_transcribe_and_edit.json` — Stage 1: recording → score, edit on the canvas, saved to `output/yue2_studio/edited_score.abc`
 * `stage2_generate_from_score.json` — Stage 2: load that file (or any `.abc`) → lyrics/language/style → render

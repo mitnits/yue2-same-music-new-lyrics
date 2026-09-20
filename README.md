@@ -4,8 +4,8 @@ Take a song, keep its melody, sing new words. Built on [YuE2](https://github.com
 a recording is transcribed to an editable ABC score with [SheetSage2](https://huggingface.co/m-a-p/SheetSage2),
 then YuE2 renders that exact score with your lyrics, in your language, optionally an octave down or in another key.
 
-It is a set of **ComfyUI custom nodes** (`comfyui/comfyui-yue2-same-music-new-lyrics`) around ComfyUI's built-in
-YuE2 nodes: transcribe, edit the score on the canvas, fit-check the lyrics, transpose, render. Example workflows included.
+A **ComfyUI custom node pack** around ComfyUI's built-in YuE2 nodes: transcribe, edit the score on the canvas,
+fit-check the lyrics, transpose, render. Example workflows included; node reference in [NODES.md](NODES.md).
 
 Optional extras: a style-prompt drafter that listens to the recording (Audio Flamingo 3 + CLAP) and a language-aware
 syllable fit check.
@@ -16,17 +16,16 @@ Linux, NVIDIA GPU (24 GB VRAM for the full-quality preset), [ComfyUI](https://gi
 [uv](https://docs.astral.sh/uv/), ffmpeg.
 
 ```bash
-git clone https://github.com/mitnits/yue2-same-music-new-lyrics ~/yue2-same-music-new-lyrics
-cd ~/yue2-same-music-new-lyrics
-./setup.sh            # SheetSage2 environment and weights (~4 GB)
-./setup.sh --extras   # also Audio Flamingo 3 + CLAP (~37 GB more)
-ln -s ~/yue2-same-music-new-lyrics/comfyui/comfyui-yue2-same-music-new-lyrics <ComfyUI>/custom_nodes/
+cd <ComfyUI>/custom_nodes
+git clone https://github.com/mitnits/yue2-same-music-new-lyrics
+cd yue2-same-music-new-lyrics
+./setup.sh            # SheetSage2 environment + weights into ./runtime (~4 GB)
+./setup.sh --extras   # also Audio Flamingo 3 + CLAP for the style-prompt drafter (~37 GB more)
 ```
 
 Put `yue2_3b_bf16.safetensors` from [Comfy-Org/YuE2](https://huggingface.co/Comfy-Org/YuE2) in
-`<ComfyUI>/models/checkpoints/`, restart ComfyUI, and open a workflow from `comfyui/.../workflows/`
-(also listed in ComfyUI's workflow sidebar once copied to `user/default/workflows/`). Set `YUE2_HOME` if this checkout
-is not at `~/yue2-same-music-new-lyrics`.
+`<ComfyUI>/models/checkpoints/`, restart ComfyUI, and open a workflow from `example_workflows/`
+(Templates → custom nodes). The nodes are under `audio/yue2-same-music-new-lyrics`.
 
 ## Notes
 
@@ -38,4 +37,4 @@ is not at `~/yue2-same-music-new-lyrics`.
 
 ## License
 
-Apache-2.0 for this repository. `yue2_studio_lib/abc_tools.py` is from the YuE repository (Apache-2.0).
+Apache-2.0 for this repository. `lib/abc_tools.py` is from the YuE repository (Apache-2.0).

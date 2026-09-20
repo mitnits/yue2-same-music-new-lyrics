@@ -1,0 +1,1 @@
+# Nothing to install into the ComfyUI environment itself; run ./setup.sh for the worker environments.

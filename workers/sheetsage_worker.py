@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Transcribe a recording with SheetSage2 into YuE2-native ABC. Runs in .venv-sheetsage2.
+"""Transcribe a recording with SheetSage2 into YuE2-native ABC. Runs in runtime/.venv-sheetsage2.
 
-    YuE/.venv-sheetsage2/bin/python sheetsage_worker.py song.mp3 --output out_dir [--melody-only] [--device auto|cuda|cpu]
+    runtime/.venv-sheetsage2/bin/python workers/sheetsage_worker.py song.mp3 --output out_dir [--melody-only] [--device auto|cuda|cpu]
 
 Prints one JSON line on stdout with the outcome. Falls back to CPU on CUDA out-of-memory.
 """
@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-MODEL_DIR = HERE / "YuE" / "models" / "SheetSage2"
+RUNTIME = Path(os.environ.get("YUE2_RUNTIME", HERE.parent / "runtime")).expanduser()
+MODEL_DIR = RUNTIME / "models" / "SheetSage2"
 
 
 def emit(**payload):

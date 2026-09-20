@@ -1,0 +1,14 @@
+[project]
+name = "yue2-same-music-new-lyrics"
+description = "Keep a song's melody, sing new lyrics: ComfyUI nodes around YuE2 and SheetSage2 (transcribe, edit the score, fit lyrics, transpose, render)."
+version = "0.1.0"
+license = { file = "LICENSE" }
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/mitnits/yue2-same-music-new-lyrics"
+
+[tool.comfy]
+PublisherId = "mitnits"
+DisplayName = "yue2-same-music-new-lyrics"
+Icon = ""

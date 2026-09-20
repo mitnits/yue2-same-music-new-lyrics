@@ -11,8 +11,8 @@ This pack adds what the Gradio UI does for the "same melody, new lyrics" and "so
   * Score Facts / Strip Chords / Compare Scores / Transpose: ABC utilities
   * Load Audio (path) / Load Text (path): convenience loaders
 
-The two heavy tools run as subprocesses in the environments created under YUE2_HOME (default ~/yue2-same-music-new-lyrics),
-so ComfyUI's own torch/transformers versions never conflict with theirs.
+The two heavy tools run as subprocesses in environments that setup.sh creates under runtime/ (override with
+YUE2_RUNTIME), so ComfyUI's own torch/transformers versions never conflict with theirs.
 """
 from __future__ import annotations
 
@@ -34,11 +34,13 @@ from comfy_api.latest import ComfyExtension, io
 
 from .lib import abc_tools, fit, transpose as transpose_lib
 
-STUDIO_HOME = Path(os.environ.get("YUE2_HOME", Path.home() / "yue2-same-music-new-lyrics")).expanduser()
-SHEETSAGE_PY = STUDIO_HOME / "YuE" / ".venv-sheetsage2" / "bin" / "python"
-SHEETSAGE_WORKER = STUDIO_HOME / "sheetsage_worker.py"
-DESCRIBE_PY = STUDIO_HOME / "YuE" / ".venv-describe" / "bin" / "python"
-DESCRIBE_WORKER = STUDIO_HOME / "describe_worker.py"
+HERE = Path(__file__).resolve().parent
+RUNTIME = Path(os.environ.get("YUE2_RUNTIME", HERE / "runtime")).expanduser()  # created by setup.sh
+SHEETSAGE_PY = RUNTIME / ".venv-sheetsage2" / "bin" / "python"
+SHEETSAGE_WORKER = HERE / "workers" / "sheetsage_worker.py"
+DESCRIBE_PY = RUNTIME / ".venv-describe" / "bin" / "python"
+DESCRIBE_WORKER = HERE / "workers" / "describe_worker.py"
+DESCRIBE_MODEL = RUNTIME / "models" / "audio-flamingo-3-hf"
 CATEGORY = "audio/yue2-same-music-new-lyrics"
 
 
@@ -63,7 +65,8 @@ def _write_audio(audio: dict, path: Path) -> Path:
 
 
 def _run_worker(cmd: list[str], log_path: Path) -> dict:
-    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(STUDIO_HOME))
+    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(HERE),
+                          env={**os.environ, "YUE2_RUNTIME": str(RUNTIME)})
     log_path.write_text(proc.stdout + "\n--- stderr ---\n" + proc.stderr, encoding="utf-8")
     lines = [ln for ln in proc.stdout.splitlines() if ln.startswith("{")]
     if not lines:
@@ -77,8 +80,7 @@ def _run_worker(cmd: list[str], log_path: Path) -> dict:
 
 def _require(path: Path, what: str):
     if not path.exists():
-        raise RuntimeError(f"{what} not found at {path}. Set YUE2_HOME to the folder that holds the "
-                           f"yue2-same-music-new-lyrics checkout (workers + venvs).")
+        raise RuntimeError(f"{what} not found at {path}. Run setup.sh in the node folder (or set YUE2_RUNTIME).")
 
 
 # ----------------------------------------------------------------------------- nodes
@@ -109,7 +111,7 @@ class Yue2SmlTranscribe(io.ComfyNode):
 
     @classmethod
     def execute(cls, audio, melody_only, name):
-        _require(SHEETSAGE_PY, "SheetSage2 environment")
+        _require(SHEETSAGE_PY, "SheetSage2 environment (runtime/.venv-sheetsage2)")
         _require(SHEETSAGE_WORKER, "sheetsage_worker.py")
         out = _work_dir(f"transcribed_{re.sub(r'[^A-Za-z0-9_.-]+', '-', name) or 'song'}")
         wav = _write_audio(audio, out / "audio.flac")
@@ -161,7 +163,7 @@ class Yue2SmlDescribe(io.ComfyNode):
 
     @classmethod
     def execute(cls, audio, language, use_audio_flamingo, use_clap, abc=""):
-        _require(DESCRIBE_PY, "Describer environment")
+        _require(DESCRIBE_PY, "Describer environment (runtime/.venv-describe)")
         _require(DESCRIBE_WORKER, "describe_worker.py")
         comfy.model_management.unload_all_models()
         comfy.model_management.soft_empty_cache()

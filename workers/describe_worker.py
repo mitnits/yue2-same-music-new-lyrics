@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Describe a recording for prompt writing: Audio Flamingo 3 Q&A + CLAP zero-shot tags. Runs in .venv-describe.
+"""Describe a recording for prompt writing: Audio Flamingo 3 Q&A + CLAP zero-shot tags. Runs in runtime/.venv-describe.
 
-    YuE/.venv-describe/bin/python describe_worker.py song.mp3 --output desc.json [--facts '{"bpm":91,...}']
+    runtime/.venv-describe/bin/python workers/describe_worker.py song.mp3 --output desc.json [--facts '{"bpm":91,...}']
 
 Prints one JSON line on stdout: {"status": "ok", "answers": {...}, "style_prompt": "...", "clap": {...}, ...}
 """
@@ -9,13 +9,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-AF3_DIR = HERE / "YuE" / "models" / "audio-flamingo-3-hf"
-CLAP_DIR = HERE / "YuE" / "models" / "clap-music"
+RUNTIME = Path(os.environ.get("YUE2_RUNTIME", HERE.parent / "runtime")).expanduser()
+AF3_DIR = RUNTIME / "models" / "audio-flamingo-3-hf"
+CLAP_DIR = RUNTIME / "models" / "clap-music"
 
 # Open questions carry NO examples: audio-language models tend to echo example lists back as "heard" instruments.
 QUESTIONS = [

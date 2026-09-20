@@ -9,26 +9,26 @@ command -v uv >/dev/null || { echo "uv is required: https://docs.astral.sh/uv/";
 command -v ffmpeg >/dev/null || { echo "ffmpeg is required"; exit 1; }
 HF="uvx --from huggingface-hub[hf_transfer]==0.36.2 hf"
 
-mkdir -p YuE/models
+R=runtime; mkdir -p $R/models
 echo "== SheetSage2 (own environment: Python 3.11, torch 2.8)"
-[ -f YuE/models/SheetSage2/config.json ] || $HF download m-a-p/SheetSage2 --local-dir YuE/models/SheetSage2
-if [ ! -x YuE/.venv-sheetsage2/bin/python ]; then
-  uv venv --python 3.11 YuE/.venv-sheetsage2
-  uv pip install --python YuE/.venv-sheetsage2/bin/python torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu128
-  grep -v -E "^torch(audio)?==" YuE/models/SheetSage2/requirements.txt > /tmp/sheetsage2-req.txt
-  uv pip install --python YuE/.venv-sheetsage2/bin/python -r /tmp/sheetsage2-req.txt soundfile
+[ -f $R/models/SheetSage2/config.json ] || $HF download m-a-p/SheetSage2 --local-dir $R/models/SheetSage2
+if [ ! -x $R/.venv-sheetsage2/bin/python ]; then
+  uv venv --python 3.11 $R/.venv-sheetsage2
+  uv pip install --python $R/.venv-sheetsage2/bin/python torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu128
+  grep -v -E "^torch(audio)?==" $R/models/SheetSage2/requirements.txt > /tmp/sheetsage2-req.txt
+  uv pip install --python $R/.venv-sheetsage2/bin/python -r /tmp/sheetsage2-req.txt soundfile
 fi
-REV=$(python3 -c "import json;print(json.load(open('YuE/models/SheetSage2/config.json'))['base_model_revision'])")
+REV=$(python3 -c "import json;print(json.load(open('$R/models/SheetSage2/config.json'))['base_model_revision'])")
 $HF download m-a-p/MERT-v2-FullSong --revision "$REV" >/dev/null
 
 if [ "$EXTRAS" = 1 ]; then
   echo "== Extras: Audio Flamingo 3 + CLAP (style prompt drafter)"
-  [ -x YuE/.venv-describe/bin/python ] || uv venv --python 3.12 YuE/.venv-describe
-  uv pip install --python YuE/.venv-describe/bin/python "torch==2.10.0" "transformers>=4.57" accelerate soundfile librosa numpy
-  [ -f YuE/models/audio-flamingo-3-hf/config.json ] || $HF download nvidia/audio-flamingo-3-hf --local-dir YuE/models/audio-flamingo-3-hf
-  [ -f YuE/models/clap-music/config.json ] || $HF download laion/larger_clap_music_and_speech --local-dir YuE/models/clap-music
+  [ -x $R/.venv-describe/bin/python ] || uv venv --python 3.12 $R/.venv-describe
+  uv pip install --python $R/.venv-describe/bin/python "torch==2.10.0" "transformers>=4.57" accelerate soundfile librosa numpy
+  [ -f $R/models/audio-flamingo-3-hf/config.json ] || $HF download nvidia/audio-flamingo-3-hf --local-dir $R/models/audio-flamingo-3-hf
+  [ -f $R/models/clap-music/config.json ] || $HF download laion/larger_clap_music_and_speech --local-dir $R/models/clap-music
 fi
 
 echo
-echo "Done. Symlink comfyui/comfyui-yue2-same-music-new-lyrics into ComfyUI/custom_nodes and download"
+echo "Done. Restart ComfyUI. If you have not yet, download the YuE2 checkpoint:"
 echo "  https://huggingface.co/Comfy-Org/YuE2/resolve/main/checkpoints/yue2_3b_bf16.safetensors -> models/checkpoints/"
