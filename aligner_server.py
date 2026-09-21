@@ -92,6 +92,12 @@ def summary(abc: str, lyrics: str, language: str, edited: bool) -> str:
     return ("EDITED score" if edited else "transcribed score") + " · " + "; ".join(parts)
 
 
+def _kind_at(section: dict, event_index: int) -> str:
+    events = [e for L in section["lines"] for e in L["events"]]
+    events.sort(key=lambda e: e["start"])
+    return events[event_index]["kind"] if 0 <= event_index < len(events) else "note"
+
+
 def view_payload(name: str, abc: str) -> dict:
     state = load_state(name) or {}
     model = align.parse(abc)
@@ -205,7 +211,7 @@ def register_routes():
             view = view_payload(name, abc)
             section = view["sections"][int(sec)]
             starts = list(section["starts"])
-            n = sum(L["note_count"] for L in section["lines"]) + len(section["lead_in"])
+            n = section["event_count"]
             k, delta = int(body["line"]), int(body["delta"])
             if not 1 <= k < len(starts):
                 return web.json_response({"error": "the first line always starts at the first note"}, status=400)
@@ -213,12 +219,11 @@ def register_routes():
             lo = starts[k - 1] + 1
             hi = (starts[k + 1] - 1) if k + 1 < len(starts) else n - 1
             if new < lo or new > hi:
-                return web.json_response({"error": "that would leave a line with no notes"}, status=400)
+                return web.json_response({"error": "that would leave a line completely empty (no notes and no pauses)"}, status=400)
             starts[k] = new
-            notes = [nn for L in section["lines"] for nn in L["notes"]]
-            notes = sorted(section["lead_in"] + notes, key=lambda x: x["id"])
-            ls[sec] = [notes[o]["start"] for o in starts]
-            msg = ("gave a note to the line above" if delta > 0 else "took a note from the line above")
+            ls[sec] = [section["event_starts"][o] for o in starts]
+            moved = "pause" if section["event_starts"] and view["sections"][int(sec)] and _kind_at(view["sections"][int(sec)], starts[k] if delta < 0 else starts[k] - 1) == "rest" else "note"
+            msg = (f"gave a {moved} to the line above" if delta > 0 else f"took a {moved} from the line above")
         save_state(name, state)
         payload = view_payload(name, abc)
         payload.update({"abc": abc, "msg": msg})

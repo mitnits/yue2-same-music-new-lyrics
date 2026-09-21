@@ -105,7 +105,7 @@ function render(){
   });
   if (S.extra_lyric_sections.length) { const d = document.createElement("div"); d.className="legend over"; d.textContent = `Lyrics sections with no sung part in the score: ${S.extra_lyric_sections.join(", ")}`; root.appendChild(d); }
   const legend = document.createElement("div"); legend.className = "legend";
-  legend.textContent = "Blue = note with its syllable · grey = held note (~, the syllable continues) · dark gaps = pauses/rests, played as silence (click one to add a pickup note) · height = pitch · notes are split across lines in proportion to syllables (snapping to a nearby rest) — use ↑↓ take/give on a line to move notes across the boundary";
+  legend.textContent = "Blue = note with its syllable · grey = held note (~, the syllable continues) · dark gaps = pauses/rests, played as silence (click one to add a pickup note) · height = pitch · notes are split across lines in proportion to syllables (snapping to a nearby rest) — use ↑↓ take/give on a line to move one note or pause across the boundary";
   root.appendChild(legend);
 }
 
@@ -126,8 +126,8 @@ function lineRow(sec, L, pxu, label){
     <div class="row"><span class="st">${L.note_count} notes ↔ ${L.syllable_count} syl</span> ${status}</div>
     <div class="row"><button class="small" data-play="synth" title="Play just this line as a simple synth (space)">▶ line</button>
       <button class="small" data-play="orig" title="Play the original recording for this line's bars" ${S.has_audio && S.bar_times.length ? "" : "disabled"}>▶ original</button>${reflowBtns}</div>`;
-  head.querySelector('[data-play="synth"]').addEventListener("click", () => playSynth(L.notes));
-  head.querySelector('[data-play="orig"]').addEventListener("click", () => playOriginal(L.notes));
+  head.querySelector('[data-play="synth"]').addEventListener("click", () => playSynth(L.notes, L.events));
+  head.querySelector('[data-play="orig"]').addEventListener("click", () => playOriginal(L.events || L.notes));
   head.querySelectorAll("[data-reflow]").forEach(b => b.addEventListener("click", () => {
     const v = b.dataset.reflow;
     if (v === "-1") reflow(sec.index, L.index, -1);          // my start moves one note earlier
@@ -136,26 +136,28 @@ function lineRow(sec, L, pxu, label){
     else reflow(sec.index, L.index + 1, +1);                 // next line's start moves later: I take its first note
   }));
   row.appendChild(head);
-  row.appendChild(roll(L.notes, pxu));
+  row.appendChild(roll(L.events || L.notes, pxu));
   return row;
 }
 
-function roll(notes, pxu){
+function roll(events, pxu){
   const wrap = document.createElement("div"); wrap.className = "roll";
-  if (!notes.length) return wrap;
-  const firstBar = Math.min(...notes.map(n=>n.bar)), lastBar = Math.max(...notes.map(n=>n.bar));
+  const notes = events.filter(e => e.kind !== "rest"), rests = events.filter(e => e.kind === "rest");
+  if (!events.length) return wrap;
+  if (!notes.length) { const d = document.createElement("div"); d.className = "st"; d.textContent = "only a pause in this line"; wrap.appendChild(d); }
+  const firstBar = Math.min(...events.map(n=>n.bar)), lastBar = Math.max(...events.map(n=>n.bar));
   const x0 = S.bars.slice(0, firstBar).reduce((a,b)=>a+b.units, 0);
   const bars = S.bars.slice(firstBar, lastBar+1);
   const totalUnits = bars.reduce((a,b)=>a+b.units,0);
   const W = totalUnits*pxu + 30, H = 130;
-  const lo = Math.min(...notes.map(n=>n.pitch)), hi = Math.max(...notes.map(n=>n.pitch));
+  const lo = notes.length ? Math.min(...notes.map(n=>n.pitch)) : 60, hi = notes.length ? Math.max(...notes.map(n=>n.pitch)) : 60;
   const y = p => 22 + (hi - p) * Math.min(8, 60/Math.max(1, hi-lo));
   const svg = document.createElementNS(NS, "svg"); svg.setAttribute("width", W); svg.setAttribute("height", H); wrap.appendChild(svg);
   let x = 12;
   bars.forEach(b => {
     const l = document.createElementNS(NS, "line"); l.setAttribute("x1", x); l.setAttribute("x2", x); l.setAttribute("y1", 4); l.setAttribute("y2", H-38); l.setAttribute("stroke", "#3a3a42"); svg.appendChild(l);
     const t = document.createElementNS(NS, "text"); t.setAttribute("x", x+3); t.setAttribute("y", 12); t.setAttribute("class", "bar"); t.textContent = `bar ${b.index+1}`; svg.appendChild(t);
-    S.rests.filter(r => r.bar === b.index).forEach(r => {
+    rests.filter(r => r.bar === b.index).forEach(r => {
       const rr = document.createElementNS(NS, "rect"); rr.setAttribute("x", 12 + (r.start - x0)*pxu); rr.setAttribute("y", 16); rr.setAttribute("width", Math.max(2, r.dur*pxu-1)); rr.setAttribute("height", H-64); rr.setAttribute("class", "rest");
       rr.addEventListener("click", () => sing(r)); const tt = document.createElementNS(NS, "title"); tt.textContent = `pause of ${r.dur} units (${(r.dur*secondsPerUnit()).toFixed(2)} s): click to add a pickup note here`; rr.appendChild(tt); svg.appendChild(rr);
       if (r.dur * pxu >= 22) { const pt = document.createElementNS(NS, "text"); pt.setAttribute("x", 12 + (r.start - x0)*pxu + 2); pt.setAttribute("y", H-8); pt.setAttribute("class", "bar"); pt.textContent = r.dur >= S.beat ? "pause" : "·"; svg.appendChild(pt); }
@@ -214,10 +216,10 @@ function playOriginal(notes){
   const stopAt = () => { if (audioEl.currentTime >= t1) { audioEl.pause(); audioEl.removeEventListener("timeupdate", stopAt); } };
   audioEl.addEventListener("timeupdate", stopAt);
 }
-function playSynth(notes){
+function playSynth(notes, events){
   stopAll(); if (!notes.length) return;
   if (!synthCtx) synthCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const spu = secondsPerUnit(), t = synthCtx.currentTime + 0.05, start0 = notes[0].start;
+  const spu = secondsPerUnit(), t = synthCtx.currentTime + 0.05, start0 = (events && events.length ? events[0] : notes[0]).start;  // a leading pause is played as silence
   notes.forEach((n, i) => {
     const at = t + (n.start - start0)*spu, dur = n.dur*spu;
     if (i > 0) { const prev = notes[i-1], gap = n.start - (prev.start + prev.dur); if (gap >= S.beat / 2) synthTimers.push(setTimeout(() => say(`… pause ${(gap*spu).toFixed(2)} s …`), (t + (prev.start + prev.dur - start0)*spu - synthCtx.currentTime)*1000)); }
@@ -243,7 +245,7 @@ window.addEventListener("keydown", e => {
   if (map[e.key]) { e.preventDefault(); doOp(map[e.key]); }
   if (e.key === "ArrowRight" && selected !== null) { e.preventDefault(); const ids = allNotes().map(n=>n.id); select(Math.min(selected+1, Math.max(...ids))); }
   if (e.key === "ArrowLeft" && selected !== null) { e.preventDefault(); select(Math.max(selected-1, 0)); }
-  if (e.key === " ") { e.preventDefault(); const w = selected !== null && lineOf(selected); if (w) playSynth(w.line.notes); }
+  if (e.key === " ") { e.preventDefault(); const w = selected !== null && lineOf(selected); if (w) playSynth(w.line.notes, w.line.events); }
   if ((e.ctrlKey || e.metaKey) && e.key === "z") { e.preventDefault(); $("undo").click(); }
 });
 load();
