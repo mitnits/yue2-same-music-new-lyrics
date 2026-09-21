@@ -412,7 +412,198 @@ def spread_untagged(chips: list, secs: list) -> list:
     return out
 
 
-def align(model: Model, lyrics: str, language: str, line_starts: dict | None = None) -> dict:
+def bar_start_units(model: Model) -> list:
+    out, pos = [], 0
+    for b in model.bars:
+        out.append(pos); pos += b.units
+    return out
+
+
+def units_to_seconds(model: Model, bar_times: list, U: int) -> float | None:
+    """Seconds for absolute unit position U using per-bar start times from the transcription's beat grid."""
+    if not bar_times:
+        return None
+    starts = bar_start_units(model)
+    b = max(i for i, s0 in enumerate(starts) if s0 <= U) if starts and starts[0] <= U else 0
+    if b >= len(bar_times):
+        return None
+    frac = (U - starts[b]) / max(1, model.bars[b].units)
+    if b + 1 < len(bar_times):
+        return bar_times[b] + frac * (bar_times[b + 1] - bar_times[b])
+    bar_sec = model.bars[b].units * (60.0 / max(1, abc_tools.parse_abc("\n".join(model.lines)).bpm)) * (4 / model.unit_den)
+    return bar_times[b] + frac * bar_sec
+
+
+def _lines_by_time(events: list, sec_span: tuple, times: list, tol: float = 0.25) -> list:
+    """Given a section's events (with 'time') and the lyric lines (global index, start, end) that belong to it,
+    return start offsets: the first event at or after each line's start (first line takes the section's lead-in)."""
+    offs = []
+    for k, L in enumerate(times):
+        if k == 0:
+            offs.append(0); continue
+        off = next((j for j, e in enumerate(events) if e.get("time") is not None and e["time"] >= L["start"] - tol), len(events))
+        offs.append(max(off, offs[-1]))
+    return offs
+
+
+def align(model: Model, lyrics: str, language: str, line_starts: dict | None = None, mode: str = "auto",
+          original_lyrics: str = "", line_times: list | None = None, bar_times: list | None = None) -> dict:
+    if mode == "recording" and line_times and bar_times:
+        return align_by_recording(model, lyrics, language, original_lyrics, line_times, bar_times, line_starts)
+    if mode == "off":
+        return align_uniform(model, lyrics, language)
+    return align_auto(model, lyrics, language, line_starts)
+
+
+def _line_texts(lyrics: str) -> list:
+    out = []
+    for raw in (lyrics or "").splitlines():
+        ln = raw.strip()
+        if not ln or re.fullmatch(r"\[[^\]]+\]", ln) or re.fullmatch(r"\(.*\)", ln):
+            continue
+        out.append(ln)
+    return out
+
+
+def _chips_for_line(text: str, language: str) -> list:
+    method = fit.method_for(language)
+    mm = fit.detect_method(text) if method == "auto" else method
+    chips = []
+    for word in re.split(r"[\s\-–—/]+", text):
+        word = word.strip(",.;:!?\"'()…")
+        if word:
+            chips.extend(syllabify(word, mm))
+    return chips
+
+
+def align_by_recording(model: Model, lyrics: str, language: str, original_lyrics: str, line_times: list,
+                       bar_times: list, line_starts: dict | None = None) -> dict:
+    """Lines come from the ORIGINAL lyrics timed against the recording; new lyrics map onto them by line index."""
+    notes = sung_notes(model)
+    secs = sections(model)
+    rests = rests_view(model)
+    beat = max(1, model.unit_den // 4)
+    orig_lines = _line_texts(original_lyrics)
+    new_lines = _line_texts(lyrics)
+    have_new = bool(new_lines)
+    # section time spans
+    sec_data = []
+    for si, sec in enumerate(secs):
+        sec_notes = [notes[i] for i in sec["notes"]]
+        events = section_events(model, sec_notes, rests)
+        for e in events:
+            e["time"] = units_to_seconds(model, bar_times, e["start"])
+        t0 = events[0]["time"] if events else None
+        last = events[-1] if events else None
+        t1 = units_to_seconds(model, bar_times, last["start"] + last["dur"]) if last else None
+        sec_data.append({"sec": sec, "notes": sec_notes, "events": events, "t0": t0, "t1": t1, "lines": []})
+    # assign each timed line to the section holding its midpoint (nearest section otherwise)
+    for k, L in enumerate(line_times):
+        mid = (L["start"] + L["end"]) / 2
+        best, best_d = None, None
+        for sd in sec_data:
+            if sd["t0"] is None:
+                continue
+            d = 0 if sd["t0"] <= mid <= sd["t1"] else min(abs(mid - sd["t0"]), abs(mid - sd["t1"]))
+            if best is None or d < best_d:
+                best, best_d = sd, d
+        if best is not None:
+            best["lines"].append(dict(L, gindex=k))
+    view_sections = []
+    for si, sd in enumerate(sec_data):
+        events = sd["events"]
+        tl = sorted(sd["lines"], key=lambda x: x["start"])
+        manual = (line_starts or {}).get(str(si))
+        if manual and tl:
+            offs = []
+            for li in range(len(tl)):
+                pos = manual[li] if li < len(manual) else None
+                off = next((j for j, e in enumerate(events) if e["start"] >= pos), len(events)) if pos is not None else (offs[-1] if offs else 0)
+                offs.append(off)
+            offs[0] = 0
+            for j in range(1, len(offs)):
+                offs[j] = min(max(offs[j], offs[j - 1]), len(events))
+        else:
+            offs = _lines_by_time(events, (sd["t0"], sd["t1"]), tl)
+        runs = runs_from_starts(offs, len(events))
+        line_views, used = [], set()
+        for li, (a, b) in enumerate(runs):
+            L = tl[li]
+            g = L["gindex"]
+            new_text = new_lines[g] if have_new and g < len(new_lines) else ""
+            chips = _chips_for_line(new_text if have_new else L["text"], language)
+            run = events[a:b]
+            run_notes = [e for e in run if e["kind"] == "note"]
+            assigned = []
+            for k2, nn in enumerate(run_notes):
+                used.add(nn["id"])
+                assigned.append(dict(nn, syllable={"line": li, "text": chips[k2]} if k2 < len(chips) else {"line": None, "text": "~"}))
+            line_events = [dict(e, syllable=next(x["syllable"] for x in assigned if x["id"] == e["id"])) if e["kind"] == "note" else e for e in run]
+            line_views.append({"index": li, "gindex": g, "chips": chips, "original": L["text"],
+                               "time": [round(L["start"], 2), round(L["end"], 2)], "timed": not L.get("interpolated"),
+                               "notes": assigned, "events": line_events, "note_count": len(run_notes),
+                               "syllable_count": len(chips), "overflow": chips[len(run_notes):],
+                               "event_count": len(run), "start_offset": a})
+        lead_in = [dict(nn, syllable={"line": None, "text": "~"}) for nn in sd["notes"] if nn["id"] not in used]
+        view_sections.append({"index": si, "name": sd["sec"]["name"], "tag": "from recording",
+                              "lines": line_views, "lead_in": lead_in, "manual": bool(manual), "starts": offs,
+                              "event_count": len(events), "event_starts": [e["start"] for e in events],
+                              "note_count": len(sd["notes"]), "syllable_count": sum(L["syllable_count"] for L in line_views),
+                              "time_span": [round(sd["t0"], 1) if sd["t0"] is not None else None, round(sd["t1"], 1) if sd["t1"] is not None else None],
+                              "notes": [], "events": []})
+    return {"unit_den": model.unit_den, "beat": beat, "key": model.header_key, "sections": view_sections,
+            "extra_lyric_sections": [], "mode": "recording",
+            "new_line_count": len(new_lines), "original_line_count": len(orig_lines), "timed_line_count": len(line_times),
+            "bars": [{"index": b.index, "units": b.units, "section": b.section} for b in model.bars]}
+
+
+def align_uniform(model: Model, lyrics: str, language: str) -> dict:
+    """No line guessing: one row per music line of the score (1-4 bars), syllables poured in order per section."""
+    notes = sung_notes(model)
+    secs = sections(model)
+    rests = rests_view(model)
+    beat = max(1, model.unit_den // 4)
+    chips = spread_untagged(lyric_chips(lyrics, language), secs)
+    bstarts = bar_start_units(model)
+    view_sections = []
+    for si, sec in enumerate(secs):
+        sec_notes = [notes[i] for i in sec["notes"]]
+        events = section_events(model, sec_notes, rests)
+        lyric = chips[si] if si < len(chips) else None
+        flat = [c for line in (lyric["lines"] if lyric else []) for c in line]
+        # rows = the score's own music-line groups
+        rows, cur, cur_group = [], [], None
+        for e in events:
+            g = model.bars[e["bar"]].group
+            if cur and g != cur_group:
+                rows.append(cur); cur = []
+            cur.append(e); cur_group = g
+        if cur:
+            rows.append(cur)
+        k = 0
+        line_views = []
+        for ri, run in enumerate(rows):
+            run_notes = [e for e in run if e["kind"] == "note"]
+            assigned = []
+            for nn in run_notes:
+                assigned.append(dict(nn, syllable={"line": ri, "text": flat[k]} if k < len(flat) else {"line": None, "text": "~"})); k += 1
+            line_events = [dict(e, syllable=next(x["syllable"] for x in assigned if x["id"] == e["id"])) if e["kind"] == "note" else e for e in run]
+            line_views.append({"index": ri, "chips": [x["syllable"]["text"] for x in assigned if x["syllable"]["line"] is not None],
+                               "notes": assigned, "events": line_events, "note_count": len(run_notes),
+                               "syllable_count": sum(1 for x in assigned if x["syllable"]["line"] is not None),
+                               "overflow": [], "event_count": len(run), "start_offset": 0, "uniform": True,
+                               "bars": f"bars {run[0]['bar'] + 1}–{run[-1]['bar'] + 1}"})
+        view_sections.append({"index": si, "name": sec["name"], "tag": lyric["tag"] if lyric else None,
+                              "lines": line_views, "lead_in": [], "manual": False, "starts": [],
+                              "event_count": len(events), "event_starts": [e["start"] for e in events],
+                              "note_count": len(sec_notes), "syllable_count": len(flat), "leftover_syllables": flat[k:],
+                              "notes": [], "events": []})
+    return {"unit_den": model.unit_den, "beat": beat, "key": model.header_key, "sections": view_sections,
+            "extra_lyric_sections": [c["tag"] for c in chips[len(secs):]], "mode": "off",
+            "bars": [{"index": b.index, "units": b.units, "section": b.section} for b in model.bars]}
+
+
+def align_auto(model: Model, lyrics: str, language: str, line_starts: dict | None = None) -> dict:
     """Section by section: lyric lines own a contiguous run of EVENTS (sung notes and the pauses between them);
     syllables are assigned to the notes of each line in order.
 
@@ -471,7 +662,7 @@ def align(model: Model, lyrics: str, language: str, line_starts: dict | None = N
                               "notes": [dict(nn, syllable={"line": None, "text": ""}) for nn in sec_notes] if not lines else [],
                               "events": events if not lines else []})
     return {"unit_den": model.unit_den, "beat": beat, "key": model.header_key, "sections": view_sections,
-            "extra_lyric_sections": [c["tag"] for c in chips[len(secs):]],
+            "extra_lyric_sections": [c["tag"] for c in chips[len(secs):]], "mode": "auto",
             "bars": [{"index": b.index, "units": b.units, "section": b.section} for b in model.bars]}
 
 

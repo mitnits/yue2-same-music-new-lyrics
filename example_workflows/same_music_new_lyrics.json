@@ -1104,7 +1104,7 @@
    ],
    "size": [
     820,
-    560
+    620
    ],
    "flags": {},
    "order": 20,
@@ -1140,6 +1140,14 @@
      "name": "transcription_folder",
      "type": "STRING",
      "link": 25
+    },
+    {
+     "name": "original_lyrics",
+     "type": "STRING",
+     "widget": {
+      "name": "original_lyrics"
+     },
+     "link": null
     }
    ],
    "outputs": [
@@ -1166,7 +1174,8 @@
    },
    "widgets_values": [
     "English",
-    "my_song"
+    "my_song",
+    ""
    ],
    "title": "LYRIC ALIGNER — notes ↔ syllables, edit by clicking"
   }

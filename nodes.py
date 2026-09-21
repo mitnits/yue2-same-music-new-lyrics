@@ -359,6 +359,9 @@ class Yue2SmlLyricAligner(io.ComfyNode):
                 io.String.Input("name", default="my_song"),
                 io.String.Input("transcription_folder", default="", optional=True,
                                 tooltip="Connect Transcribe's 'folder' output to enable playback of the original recording per phrase."),
+                io.String.Input("original_lyrics", default="", multiline=True, optional=True,
+                                tooltip="The recording's own lyrics. With them the aligner can time each line against the "
+                                        "recording (Whisper) and map your new lines onto the real melody lines."),
             ],
             outputs=[io.String.Output(display_name="abc"), io.String.Output(display_name="lyrics"),
                      io.String.Output(display_name="report")],
@@ -366,8 +369,8 @@ class Yue2SmlLyricAligner(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, abc, lyrics, language, name, transcription_folder=""):
-        state = aligner_server.prepare_session(name, abc, lyrics, language, transcription_folder)
+    def execute(cls, abc, lyrics, language, name, transcription_folder="", original_lyrics=""):
+        state = aligner_server.prepare_session(name, abc, lyrics, language, transcription_folder, original_lyrics)
         out_abc = state.get("edited_abc") or abc
         edited = bool(state.get("edited_abc"))
         report = aligner_server.summary(out_abc, lyrics, language, edited)

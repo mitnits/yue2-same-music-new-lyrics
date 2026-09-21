@@ -22,11 +22,12 @@ REV=$(python3 -c "import json;print(json.load(open('$R/models/SheetSage2/config.
 $HF download m-a-p/MERT-v2-FullSong --revision "$REV" >/dev/null
 
 if [ "$EXTRAS" = 1 ]; then
-  echo "== Extras: Audio Flamingo 3 + CLAP (style prompt drafter)"
+  echo "== Extras: Whisper (lyric timing), Audio Flamingo 3 + CLAP (style prompt drafter)"
   [ -x $R/.venv-describe/bin/python ] || uv venv --python 3.12 $R/.venv-describe
   uv pip install --python $R/.venv-describe/bin/python "torch==2.10.0" "transformers>=4.57" accelerate soundfile librosa numpy
   [ -f $R/models/audio-flamingo-3-hf/config.json ] || $HF download nvidia/audio-flamingo-3-hf --local-dir $R/models/audio-flamingo-3-hf
   [ -f $R/models/clap-music/config.json ] || $HF download laion/larger_clap_music_and_speech --local-dir $R/models/clap-music
+  [ -f $R/models/whisper-large-v3-turbo/config.json ] || $HF download openai/whisper-large-v3-turbo --local-dir $R/models/whisper-large-v3-turbo --exclude "*.msgpack" "*.h5" "*tf_model*"
 fi
 
 echo

@@ -36,7 +36,12 @@
   <span class="muted" id="meta"></span>
   <button id="undo" title="Undo the last note change (Ctrl+Z)">↶ Undo</button>
   <button id="reset" title="Back to the transcription, discarding all note edits">Reset notes</button>
-  <button id="editlyrics" title="Edit the lyrics used for the syllables">Lyrics…</button>
+  <button id="editlyrics" title="Edit the lyrics used for the syllables, and the original lyrics for timing">Lyrics…</button>
+  <label class="muted" title="How lyric lines are matched to notes">match lines: <select id="mode">
+    <option value="auto">by syllable count (guess)</option>
+    <option value="recording">from the recording (timed)</option>
+    <option value="off">off — show notes uniformly</option></select></label>
+  <button id="timebtn" title="Whisper listens to the recording and times each ORIGINAL lyric line; new lyrics then map onto those lines">⏱ Time lyrics from recording</button>
   <button id="stop" title="Stop playback">■ Stop</button>
   <span id="msg"></span>
 </header>
@@ -53,11 +58,14 @@
 </div>
 <main>
   <div id="lyricsbox">
-    <textarea id="lyrics"></textarea>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+      <div><div class="muted">NEW lyrics (what will be sung)</div><textarea id="lyrics"></textarea></div>
+      <div><div class="muted">ORIGINAL lyrics of the recording (for timing; language: <select id="origlang"><option value="">auto-detect</option></select>)</div><textarea id="origlyrics"></textarea></div>
+    </div>
     <div style="margin-top:6px; display:flex; gap:8px; align-items:center">
-      <label>Language <select id="language"></select></label>
+      <label>Language of the new lyrics <select id="language"></select></label>
       <button id="applylyrics" class="primary">Apply</button>
-      <span class="muted">Hyphenate a word (ev-ery) to force how it splits into syllables. Paste the same text into ComfyUI's NEW LYRICS box before rendering.</span>
+      <span class="muted">Hyphenate a word (ev-ery) to force how it splits into syllables. Paste the same NEW lyrics into ComfyUI's NEW LYRICS box before rendering.</span>
     </div>
   </div>
   <div id="sections"></div>
@@ -75,13 +83,21 @@ async function api(path, body){
   const r = await fetch(path, body ? {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)} : {});
   const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText); return j;
 }
-function meta(){ $("meta").textContent = `key ${S.key} · ${S.bpm} BPM · ${S.language}${S.edited ? " · EDITED" : ""}`; }
+function meta(){ $("meta").textContent = `key ${S.key} · ${S.bpm} BPM · ${S.language}${S.edited ? " · EDITED" : ""}${modeMeta()}`; }
 async function load(){
   try { S = await api(`/yue2sml/session?name=${encodeURIComponent(NAME)}`); } catch(e){ say(e.message, true); return; }
   $("title").textContent = `Lyric Aligner · ${S.name}`; meta();
   const sel = $("language"); if (!sel.options.length) LANGS.forEach(l => { const o=document.createElement("option"); o.value=o.textContent=l; sel.appendChild(o); });
-  sel.value = S.language; $("lyrics").value = S.lyrics; render();
+  sel.value = S.language; $("lyrics").value = S.lyrics;
+  const ol = $("origlang"); if (ol.options.length === 1) LANGS.forEach(l => { const o=document.createElement("option"); o.value=o.textContent=l; ol.appendChild(o); });
+  if (S.original_lyrics !== undefined) $("origlyrics").value = S.original_lyrics;
+  $("mode").value = S.mode || "auto";
+  $("mode").querySelector('[value="recording"]').disabled = !S.has_timing;
+  $("timebtn").disabled = !S.timing_available;
+  $("timebtn").title = S.timing_available ? "Whisper listens to the recording and times each ORIGINAL lyric line (about a minute)" : "needs the recording (connect Transcribe's folder) and setup.sh --extras (Whisper)";
+  render();
 }
+function modeMeta(){ const m = S.mode || "auto"; const ti = S.timing_info; return m === "recording" && ti ? ` · timed ${ti.matched}/${ti.total} words` : ""; }
 function secondsPerUnit(){ return (60 / S.bpm) * (4 / S.unit_den); }
 function allNotes(){ const out=[]; for (const s of S.sections){ for (const L of s.lines) out.push(...L.notes); out.push(...s.lead_in); out.push(...(s.notes||[])); } return out.sort((a,b)=>a.id-b.id); }
 function noteById(id){ return allNotes().find(n=>n.id===id) || null; }
@@ -98,6 +114,8 @@ function render(){
              : bad ? `<span class="st bad">${bad} line${bad>1?"s":""} to fix</span>` : '<span class="st good">all lines fit</span>';
     el.innerHTML = `<h3>${sec.name} <span class="st">${sec.note_count} notes</span> ↔ ${sec.tag ? "["+sec.tag+"]" : ""} <span class="st">${sec.syllable_count} syllables</span> ${st} ${sec.manual ? '<button class="small" data-auto="1" title="Forget the manual reflow of this section and split notes proportionally again">auto split</button>' : '<span class="st">auto split</span>'}</h3>`;
     const autoBtn = el.querySelector("[data-auto]"); if (autoBtn) autoBtn.addEventListener("click", () => reflow(sec.index, null, null, true));
+    if (sec.time_span && sec.time_span[0] != null) el.querySelector("h3").insertAdjacentHTML("beforeend", `<span class="st">${sec.time_span[0]}–${sec.time_span[1]} s</span>`);
+    if (sec.leftover_syllables && sec.leftover_syllables.length) el.querySelector("h3").insertAdjacentHTML("beforeend", `<span class="st bad">${sec.leftover_syllables.length} syllables beyond the last note</span>`);
     if (sec.lead_in.length) el.appendChild(lineRow(sec, {index:-1, chips:[], notes:sec.lead_in, note_count:sec.lead_in.length, syllable_count:0, overflow:[], pinned:false}, pxu, "lead-in (no lyrics)"));
     if (!sec.lines.length && sec.notes && sec.notes.length) el.appendChild(lineRow(sec, {index:-1, chips:[], notes:sec.notes, note_count:sec.notes.length, syllable_count:0, overflow:[], pinned:false}, pxu, "no lyrics for this section"));
     sec.lines.forEach(L => el.appendChild(lineRow(sec, L, pxu)));
@@ -118,12 +136,14 @@ function lineRow(sec, L, pxu, label){
       L.overflow.length ? `<span class="st bad">${L.overflow.length} syllable${L.overflow.length>1?"s":""} without a note: <span class="over">${L.overflow.join(" ")}</span></span>` :
       d > 2 ? `<span class="st">${d} held notes (~)</span>` : d > 0 ? `<span class="st good">fits (${d} held)</span>` : `<span class="st good">fits</span>`;
   const last = L.index >= 0 && L.index === sec.lines.length - 1, first = L.index === 0;
-  const reflowBtns = L.index < 0 ? "" : `<span style="border-left:1px solid var(--line); height:16px; margin:0 2px"></span>
+  const reflowBtns = (L.index < 0 || L.uniform) ? "" : `<span style="border-left:1px solid var(--line); height:16px; margin:0 2px"></span>
       <button class="small" data-reflow="-1" title="Take the last note of the line above into this line" ${first ? "disabled" : ""}>↑ take</button>
       <button class="small" data-reflow="+1" title="Give this line's first note to the line above" ${first ? "disabled" : ""}>↑ give</button>
       <button class="small" data-reflow="next-1" title="Give this line's last note to the line below" ${last ? "disabled" : ""}>↓ give</button>
       <button class="small" data-reflow="next+1" title="Take the first note of the line below into this line" ${last ? "disabled" : ""}>↓ take</button>`;
-  head.innerHTML = `<div class="txt">${L.index >= 0 ? "<b>"+(L.index+1)+".</b>" : ""}${L.chips.length ? L.chips.join("·") : ""}</div>
+  const orig = L.original ? `<div class="muted" style="font-size:12px">${L.timed === false ? "≈ " : ""}${L.time ? L.time[0] + "–" + L.time[1] + " s · " : ""}${L.original}</div>` : "";
+  const numLabel = L.uniform ? `<b>${L.bars}</b>` : (L.index >= 0 ? "<b>"+(L.gindex !== undefined ? L.gindex + 1 : L.index + 1)+".</b>" : "");
+  head.innerHTML = `${orig}<div class="txt">${numLabel}${L.chips.length ? L.chips.join("·") : ""}</div>
     <div class="row"><span class="st">${L.note_count} notes ↔ ${L.syllable_count} syl</span> ${status}</div>
     <div class="row"><button class="small" data-play="synth" title="Play just this line as a simple synth (space)">▶ line</button>
       <button class="small" data-play="orig" title="Play the original recording for this line's bars" ${S.has_audio && S.bar_times.length ? "" : "disabled"}>▶ original</button>${reflowBtns}</div>`;
@@ -238,7 +258,15 @@ document.querySelectorAll("#toolbar button[data-op]").forEach(b => b.addEventLis
 $("undo").addEventListener("click", () => { if (!history.length) { say("nothing to undo"); return; } setAbc(history.pop()); });
 $("reset").addEventListener("click", () => { if (confirm("Discard all note edits and go back to the transcription? (your line reflow is kept)")) { history = []; setAbc(null); } });
 $("editlyrics").addEventListener("click", () => { const b = $("lyricsbox"); b.style.display = b.style.display === "block" ? "none" : "block"; });
-$("applylyrics").addEventListener("click", async () => { try { applyPayload(await api("/yue2sml/lyrics", {name: NAME, lyrics: $("lyrics").value, language: $("language").value}), "lyrics updated for the alignment view"); } catch(e){ say(e.message, true); } });
+$("applylyrics").addEventListener("click", async () => { try { applyPayload(await api("/yue2sml/lyrics", {name: NAME, lyrics: $("lyrics").value, language: $("language").value, original_lyrics: $("origlyrics").value}), "lyrics updated for the alignment view"); } catch(e){ say(e.message, true); } });
+$("mode").addEventListener("change", async () => { try { applyPayload(await api("/yue2sml/mode", {name: NAME, mode: $("mode").value})); } catch(e){ say(e.message, true); $("mode").value = S.mode || "auto"; } });
+$("timebtn").addEventListener("click", async () => {
+  const orig = $("origlyrics").value.trim();
+  if (!orig && !confirm("No original lyrics pasted (Lyrics… box). Time the NEW lyrics against the recording instead?")) return;
+  say("⏱ listening to the recording… (about a minute)"); $("timebtn").disabled = true;
+  try { const r = await api("/yue2sml/time_lyrics", {name: NAME, original_lyrics: orig || null, language: $("origlang").value}); S = Object.assign(S, r); $("mode").querySelector('[value="recording"]').disabled = false; $("mode").value = "recording"; meta(); render(); say(r.msg); }
+  catch(e){ say(e.message, true); } finally { $("timebtn").disabled = false; }
+});
 $("stop").addEventListener("click", stopAll);
 window.addEventListener("keydown", e => {
   if (e.target.tagName === "TEXTAREA") return;

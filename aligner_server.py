@@ -4,6 +4,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
+import subprocess
 from pathlib import Path
 
 import folder_paths
@@ -12,6 +14,10 @@ from .lib import abc_tools, align, fit
 
 HERE = Path(__file__).resolve().parent
 OUT_SUBDIR = "yue2-same-music-new-lyrics/aligner"
+RUNTIME = Path(os.environ.get("YUE2_RUNTIME", HERE / "runtime")).expanduser()
+TIMING_PY = RUNTIME / ".venv-describe" / "bin" / "python"
+TIMING_WORKER = HERE / "workers" / "lyrics_timing_worker.py"
+TIMING_MODEL = RUNTIME / "models" / "whisper-large-v3-turbo"
 
 
 def _session_dir(name: str) -> Path:
@@ -64,7 +70,7 @@ def audio_path(folder: str) -> Path | None:
     return None
 
 
-def prepare_session(name: str, abc: str, lyrics: str, language: str, folder: str = "") -> dict:
+def prepare_session(name: str, abc: str, lyrics: str, language: str, folder: str = "", original_lyrics: str = "") -> dict:
     """Called by the node on every run. A new base score invalidates old edits."""
     state = load_state(name) or {}
     h = _hash(abc)
@@ -74,8 +80,14 @@ def prepare_session(name: str, abc: str, lyrics: str, language: str, folder: str
                             f"(kept as edited_score.previous.abc)")
             (_session_dir(name) / "edited_score.previous.abc").write_text(state["edited_abc"], encoding="utf-8")
         state = {"base_abc": abc, "base_hash": h, "edited_abc": None, "history": [], "line_starts": {}}
+    if original_lyrics and original_lyrics.strip() != (state.get("original_lyrics") or "").strip():
+        state["line_times"] = None  # new original lyrics: timing must be redone
     state.update({"lyrics": lyrics, "language": language, "folder": folder, "bar_times": bar_times(folder),
+                  "original_lyrics": original_lyrics or state.get("original_lyrics", ""),
                   "bpm": int((abc_tools.parse_abc(abc)).bpm)})
+    state.setdefault("mode", "auto")
+    if state.get("mode") == "recording" and not state.get("line_times"):
+        state["mode"] = "auto"
     save_state(name, state)
     return state
 
@@ -101,7 +113,13 @@ def _kind_at(section: dict, event_index: int) -> str:
 def view_payload(name: str, abc: str) -> dict:
     state = load_state(name) or {}
     model = align.parse(abc)
-    v = align.align(model, state.get("lyrics", ""), state.get("language", "English"), state.get("line_starts") or {})
+    v = align.align(model, state.get("lyrics", ""), state.get("language", "English"), state.get("line_starts") or {},
+                    mode=state.get("mode", "auto"), original_lyrics=state.get("original_lyrics", ""),
+                    line_times=state.get("line_times"), bar_times=state.get("bar_times", []))
+    v["timing_available"] = TIMING_PY.is_file() and TIMING_WORKER.is_file() and (TIMING_MODEL / "config.json").is_file() and audio_path(state.get("folder", "")) is not None
+    v["has_timing"] = bool(state.get("line_times"))
+    v["original_lyrics"] = state.get("original_lyrics", "")
+    v["timing_info"] = state.get("timing_info")
     v["rests"] = align.rests_view(model)
     v["bpm"] = model and int(abc_tools.parse_abc(abc).bpm)
     v["bar_times"] = state.get("bar_times", [])
@@ -188,6 +206,11 @@ def register_routes():
         state = load_state(name) or {}
         state["lyrics"] = body.get("lyrics", state.get("lyrics", ""))
         state["language"] = body.get("language", state.get("language", "English"))
+        if body.get("original_lyrics") is not None and body["original_lyrics"].strip() != (state.get("original_lyrics") or "").strip():
+            state["original_lyrics"] = body["original_lyrics"]
+            state["line_times"] = None
+            if state.get("mode") == "recording":
+                state["mode"] = "auto"
         save_state(name, state)
         abc = state.get("edited_abc") or state["base_abc"]
         payload = view_payload(name, abc)
@@ -241,6 +264,60 @@ def register_routes():
         save_state(name, state)
         payload = view_payload(name, abc)
         payload.update({"abc": abc, "msg": msg})
+        return web.json_response(payload)
+
+    @routes.post("/yue2sml/mode")
+    async def set_mode(request):
+        body = await request.json()
+        name = body["name"]
+        state = load_state(name) or {}
+        mode = body.get("mode", "auto")
+        if mode == "recording" and not state.get("line_times"):
+            return web.json_response({"error": "time the lyrics from the recording first"}, status=400)
+        state["mode"] = mode
+        save_state(name, state)
+        abc = state.get("edited_abc") or state["base_abc"]
+        payload = view_payload(name, abc); payload["abc"] = abc; payload["msg"] = f"line matching: {mode}"
+        return web.json_response(payload)
+
+    @routes.post("/yue2sml/time_lyrics")
+    async def time_lyrics(request):
+        """Run Whisper on the session's recording and time the ORIGINAL lyrics (falls back to the new lyrics)."""
+        body = await request.json()
+        name = body["name"]
+        state = load_state(name) or {}
+        if body.get("original_lyrics") is not None:
+            state["original_lyrics"] = body["original_lyrics"]
+        text = (state.get("original_lyrics") or "").strip() or (state.get("lyrics") or "").strip()
+        if not text:
+            return web.json_response({"error": "no lyrics to time: paste the original lyrics first"}, status=400)
+        audio = audio_path(state.get("folder", ""))
+        if audio is None:
+            return web.json_response({"error": "no recording for this session (connect Transcribe's folder output)"}, status=400)
+        if not (TIMING_PY.is_file() and TIMING_WORKER.is_file() and (TIMING_MODEL / "config.json").is_file()):
+            return web.json_response({"error": "lyric timing needs runtime/.venv-describe and runtime/models/whisper-large-v3-turbo (setup.sh --extras)"}, status=400)
+        d = _session_dir(name)
+        (d / "original_lyrics.txt").write_text(text, encoding="utf-8")
+        lang = body.get("language") or state.get("original_language") or ""
+        cmd = [str(TIMING_PY), str(TIMING_WORKER), str(audio), str(d / "original_lyrics.txt"), "--output", str(d / "timing.json")]
+        if lang:
+            cmd += ["--language", lang]
+        proc = await __import__("asyncio").get_event_loop().run_in_executor(
+            None, lambda: subprocess.run(cmd, capture_output=True, text=True, cwd=str(HERE), env={**os.environ, "YUE2_RUNTIME": str(RUNTIME)}))
+        (d / "timing.log").write_text(proc.stdout + "\n--- stderr ---\n" + proc.stderr, encoding="utf-8")
+        lines = [ln for ln in proc.stdout.splitlines() if ln.startswith("{")]
+        rep = json.loads(lines[-1]) if lines else {"status": "error", "error": proc.stderr[-400:]}
+        if rep.get("status") != "ok":
+            return web.json_response({"error": f"timing failed: {rep.get('error')}"}, status=500)
+        state["line_times"] = rep["lines"]
+        state["timing_info"] = {"match_ratio": rep["match_ratio"], "matched": rep["matched_words"], "total": rep["total_words"],
+                                "seconds": rep["seconds"], "language": rep.get("language")}
+        state["original_language"] = lang
+        state["mode"] = "recording"
+        save_state(name, state)
+        abc = state.get("edited_abc") or state["base_abc"]
+        payload = view_payload(name, abc); payload["abc"] = abc
+        payload["msg"] = f"timed {rep['matched_words']}/{rep['total_words']} words in {rep['seconds']} s; line matching now follows the recording"
         return web.json_response(payload)
 
     @routes.get("/yue2sml/audio")
