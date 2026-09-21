@@ -345,31 +345,113 @@ def lyric_chips(lyrics: str, language: str) -> list:
     return out
 
 
-def align(model: Model, lyrics: str, language: str) -> dict:
-    """Assign syllables to sung notes section by section. Returns a JSON-ready view for the editor."""
+def phrase_gap(model: Model, notes: list, i: int) -> int:
+    """Units of rest between sung note i and i+1 of `notes` (0 when they touch)."""
+    a, b = notes[i], notes[i + 1]
+    return max(0, b["start"] - (a["start"] + a["dur"]))
+
+
+def assign_lines(notes: list, syllables: list, beat: int, starts: dict | None = None) -> list:
+    """Split a section's sung notes into one run per lyric line.
+
+    Dynamic programme over note boundaries: line k takes notes [a, b); cost = |syllables_k - (b - a)| plus a
+    penalty when the boundary after b is not at a rest (a line should end where the singer breathes).
+    `starts` = {line_index: note_offset} pins a line's first note (user override). Returns [(a, b), ...] per line;
+    lines that get no notes (more lines than notes) return (n, n)."""
+    n, m = len(notes), len(syllables)
+    if n == 0 or m == 0:
+        return [(0, 0)] * m
+    starts = starts or {}
+    gap_after = [phrase_gap(None, notes, i) if i < n - 1 else beat * 4 for i in range(n)]
+
+    def boundary_penalty(b):  # boundary after note b-1
+        g = gap_after[b - 1]
+        if g >= beat:
+            return 0.0
+        if g >= beat // 2:
+            return 0.5
+        if g > 0:
+            return 1.0
+        return 2.0
+
+    INF = float("inf")
+    best = [[INF] * (n + 1) for _ in range(m + 1)]
+    back = [[None] * (n + 1) for _ in range(m + 1)]
+    best[0][0] = 0.0
+    for k in range(1, m + 1):
+        syl = syllables[k - 1]
+        forced = starts.get(k - 1)
+        for b in range(1, n + 1):
+            lo = 1 if k > 1 else 1
+            a_range = [forced] if forced is not None and forced < b else (range(k - 1, b) if forced is None else [])
+            for a in a_range:
+                if best[k - 1][a] == INF:
+                    continue
+                cost = best[k - 1][a] + abs(syl - (b - a)) + boundary_penalty(b) * 1.5
+                if cost < best[k][b]:
+                    best[k][b] = cost; back[k][b] = a
+    # all notes must be used by the last line if possible; otherwise take the best reachable end
+    if best[m][n] < INF:
+        b = n
+    else:
+        b = max(range(n + 1), key=lambda x: (best[m][x] < INF, -best[m][x] if best[m][x] < INF else 0))
+        if best[m][b] == INF:  # fewer notes than lines: give one note per line while they last
+            runs, pos = [], 0
+            for k in range(m):
+                if pos < n:
+                    runs.append((pos, pos + 1)); pos += 1
+                else:
+                    runs.append((n, n))
+            return runs
+    runs = []
+    for k in range(m, 0, -1):
+        a = back[k][b]
+        runs.append((a, b)); b = a
+    runs.reverse()
+    return runs
+
+
+def align(model: Model, lyrics: str, language: str, line_starts: dict | None = None) -> dict:
+    """Section by section: lyric lines matched to phrases of sung notes, syllables assigned inside each line.
+
+    line_starts: {section_index: {line_index: absolute_start_units}} user overrides (the note whose start is
+    >= that position becomes the line's first note)."""
     notes = sung_notes(model)
     secs = sections(model)
     chips = lyric_chips(lyrics, language)
+    beat = max(1, model.unit_den // 4)
     view_sections = []
-    for i, sec in enumerate(secs):
+    for si, sec in enumerate(secs):
         ids = sec["notes"]
-        lyric = chips[i] if i < len(chips) else None
-        flat = [(li, c) for li, line in enumerate(lyric["lines"]) for c in line] if lyric else []
-        assigned = {}
-        for k, nid in enumerate(ids):
-            if k < len(flat):
-                assigned[nid] = {"line": flat[k][0], "text": flat[k][1]}
-            else:
-                assigned[nid] = {"line": None, "text": "~"}  # melisma: note carries the previous syllable
-        overflow = [{"line": li, "text": c} for li, c in flat[len(ids):]]
-        view_sections.append({"name": sec["name"], "tag": lyric["tag"] if lyric else None,
-                              "notes": [dict(notes[nid], syllable=assigned[nid]) for nid in ids],
-                              "overflow": overflow, "lines": lyric["lines"] if lyric else [],
-                              "note_count": len(ids), "syllable_count": len(flat)})
-    extra_lyric_sections = [c["tag"] for c in chips[len(secs):]]
-    return {"unit_den": model.unit_den, "key": model.header_key, "sections": view_sections,
-            "extra_lyric_sections": extra_lyric_sections, "bars": [
-                {"index": b.index, "units": b.units, "section": b.section} for b in model.bars]}
+        sec_notes = [notes[i] for i in ids]
+        lyric = chips[si] if si < len(chips) else None
+        lines = lyric["lines"] if lyric else []
+        starts = {}
+        for li, pos in ((int(k), v) for k, v in (line_starts or {}).get(str(si), {}).items()):
+            off = next((j for j, nn in enumerate(sec_notes) if nn["start"] >= pos), None)
+            if off is not None:
+                starts[li] = off
+        runs = assign_lines(sec_notes, [len(l) for l in lines], beat, starts)
+        used = set()
+        line_views = []
+        for li, (a, b) in enumerate(runs):
+            run = sec_notes[a:b]
+            syls = lines[li]
+            assigned = []
+            for k, nn in enumerate(run):
+                used.add(nn["id"])
+                assigned.append(dict(nn, syllable={"line": li, "text": syls[k]} if k < len(syls) else {"line": None, "text": "~"}))
+            line_views.append({"index": li, "chips": syls, "notes": assigned, "note_count": len(run),
+                               "syllable_count": len(syls), "overflow": syls[len(run):],
+                               "start_pos": run[0]["start"] if run else None, "pinned": li in starts})
+        lead_in = [dict(nn, syllable={"line": None, "text": "~"}) for nn in sec_notes if nn["id"] not in used]
+        view_sections.append({"index": si, "name": sec["name"], "tag": lyric["tag"] if lyric else None,
+                              "lines": line_views, "lead_in": lead_in,
+                              "note_count": len(ids), "syllable_count": sum(len(l) for l in lines),
+                              "notes": [dict(nn, syllable={"line": None, "text": ""}) for nn in sec_notes] if not lines else []})
+    return {"unit_den": model.unit_den, "beat": beat, "key": model.header_key, "sections": view_sections,
+            "extra_lyric_sections": [c["tag"] for c in chips[len(secs):]],
+            "bars": [{"index": b.index, "units": b.units, "section": b.section} for b in model.bars]}
 
 
 # ----------------------------------------------------------------------------- edit operations

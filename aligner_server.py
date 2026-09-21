@@ -73,7 +73,7 @@ def prepare_session(name: str, abc: str, lyrics: str, language: str, folder: str
             logging.warning(f"[yue2-sml] Lyric Aligner '{name}': the incoming score changed; previous edits set aside "
                             f"(kept as edited_score.previous.abc)")
             (_session_dir(name) / "edited_score.previous.abc").write_text(state["edited_abc"], encoding="utf-8")
-        state = {"base_abc": abc, "base_hash": h, "edited_abc": None, "history": []}
+        state = {"base_abc": abc, "base_hash": h, "edited_abc": None, "history": [], "line_starts": {}}
     state.update({"lyrics": lyrics, "language": language, "folder": folder, "bar_times": bar_times(folder),
                   "bpm": int((abc_tools.parse_abc(abc)).bpm)})
     save_state(name, state)
@@ -86,7 +86,8 @@ def summary(abc: str, lyrics: str, language: str, edited: bool) -> str:
     parts = []
     for s in view["sections"]:
         tag = f"[{s['tag']}]" if s["tag"] else "(no lyrics)"
-        flag = "ok" if s["syllable_count"] and abs(s["syllable_count"] - s["note_count"]) <= max(2, s["note_count"] // 10) else "check"
+        bad = sum(1 for L in s["lines"] if L["overflow"] or L["note_count"] - L["syllable_count"] > 2)
+        flag = "ok" if s["lines"] and not bad else (f"{bad} line(s) to fix" if s["lines"] else "no lyrics")
         parts.append(f"{s['name']} {s['note_count']} notes ↔ {tag} {s['syllable_count']} syllables ({flag})")
     return ("EDITED score" if edited else "transcribed score") + " · " + "; ".join(parts)
 
@@ -94,7 +95,7 @@ def summary(abc: str, lyrics: str, language: str, edited: bool) -> str:
 def view_payload(name: str, abc: str) -> dict:
     state = load_state(name) or {}
     model = align.parse(abc)
-    v = align.align(model, state.get("lyrics", ""), state.get("language", "English"))
+    v = align.align(model, state.get("lyrics", ""), state.get("language", "English"), state.get("line_starts") or {})
     v["rests"] = align.rests_view(model)
     v["bpm"] = model and int(abc_tools.parse_abc(abc).bpm)
     v["bar_times"] = state.get("bar_times", [])
@@ -185,6 +186,25 @@ def register_routes():
         abc = state.get("edited_abc") or state["base_abc"]
         payload = view_payload(name, abc)
         payload["abc"] = abc
+        return web.json_response(payload)
+
+    @routes.post("/yue2sml/linestart")
+    async def linestart(request):
+        """Pin (or unpin) where a lyric line starts: {name, section, line, pos|null}. pos = absolute start units."""
+        body = await request.json()
+        name = body["name"]
+        state = load_state(name) or {}
+        ls = state.setdefault("line_starts", {})
+        sec, line = str(int(body["section"])), str(int(body["line"]))
+        if body.get("pos") is None:
+            ls.get(sec, {}).pop(line, None)
+        else:
+            ls.setdefault(sec, {})[line] = int(body["pos"])
+        save_state(name, state)
+        abc = state.get("edited_abc") or state["base_abc"]
+        payload = view_payload(name, abc)
+        payload["abc"] = abc
+        payload["msg"] = "line start pinned" if body.get("pos") is not None else "line start unpinned"
         return web.json_response(payload)
 
     @routes.get("/yue2sml/audio")
