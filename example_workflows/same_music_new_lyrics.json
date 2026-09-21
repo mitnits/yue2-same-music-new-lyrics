@@ -1,8 +1,8 @@
 {
  "id": "yue2-sml-same-melody-new-lyrics",
  "revision": 0,
- "last_node_id": 19,
- "last_link_id": 22,
+ "last_node_id": 20,
+ "last_link_id": 25,
  "nodes": [
   {
    "id": 1,
@@ -23,7 +23,7 @@
    "title": "same melody, new lyrics",
    "properties": {},
    "widgets_values": [
-    "# Same melody, new lyrics\n\n1. **Load Audio**: pick the recording (press R after adding files to Downloads).\n2. **Transcribe** → score. The **Score Editor** box fills with it; edit there if you like and queue again (transcription is cached). Type `RESET` to reload.\n3. Paste **NEW LYRICS** (one `[Section]` per sung section, in order), set the **song language**, write the **style prompt** without a language tag.\n4. **TRANSPOSE** sliders: `vocal_octave -1` = singer one octave down (same notes); `key_shift` = whole song in another key. Both keep the harmony. Match the style prompt's voice type to the new range.\n5. Queue. mode `full` keeps the transcribed chords.\n\nOptional nodes in the `audio/yue2-same-music-new-lyrics` menu: Describe Track, Strip Chords, Compare Scores."
+    "# Same melody, new lyrics\n\n1. **Load Audio**: pick the recording (press R after adding files to Downloads).\n2. **Transcribe** → score. The **Score Editor** box fills with it; edit there if you like and queue again (transcription is cached). Type `RESET` to reload.\n3. Paste **NEW LYRICS**; the **LYRIC ALIGNER** shows each section's notes as blocks with your syllables under them — click a note and use Split / Merge / Longer / Shorter / Up / Down, click a grey rest to add a pickup note, ▶ to hear the phrase (synth or the original). Its edits flow downstream; queue again to render. (one `[Section]` per sung section, in order), set the **song language**, write the **style prompt** without a language tag.\n4. **TRANSPOSE** sliders: `vocal_octave -1` = singer one octave down (same notes); `key_shift` = whole song in another key. Both keep the harmony. Match the style prompt's voice type to the new range.\n5. Queue. mode `full` keeps the transcribed chords.\n\nOptional nodes in the `audio/yue2-same-music-new-lyrics` menu: Describe Track, Strip Chords, Compare Scores."
    ],
    "color": "#432",
    "bgcolor": "#653"
@@ -138,7 +138,9 @@
     {
      "name": "folder",
      "type": "STRING",
-     "links": []
+     "links": [
+      25
+     ]
     }
    ],
    "properties": {
@@ -233,7 +235,7 @@
      "name": "abc",
      "type": "STRING",
      "links": [
-      21
+      23
      ]
     },
     {
@@ -287,7 +289,8 @@
      "type": "STRING",
      "links": [
       5,
-      10
+      10,
+      24
      ]
     }
    ],
@@ -1091,6 +1094,81 @@
    },
    "widgets_values": [],
    "title": "Transpose report (vocal range)"
+  },
+  {
+   "id": 20,
+   "type": "Yue2SmlLyricAligner",
+   "pos": [
+    760,
+    -460
+   ],
+   "size": [
+    820,
+    560
+   ],
+   "flags": {},
+   "order": 20,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "abc",
+     "type": "STRING",
+     "link": 23
+    },
+    {
+     "name": "lyrics",
+     "type": "STRING",
+     "link": 24
+    },
+    {
+     "name": "language",
+     "type": "COMBO",
+     "widget": {
+      "name": "language"
+     },
+     "link": null
+    },
+    {
+     "name": "name",
+     "type": "STRING",
+     "widget": {
+      "name": "name"
+     },
+     "link": null
+    },
+    {
+     "name": "transcription_folder",
+     "type": "STRING",
+     "link": 25
+    }
+   ],
+   "outputs": [
+    {
+     "name": "abc",
+     "type": "STRING",
+     "links": [
+      21
+     ]
+    },
+    {
+     "name": "lyrics",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "Yue2SmlLyricAligner"
+   },
+   "widgets_values": [
+    "English",
+    "my_song"
+   ],
+   "title": "LYRIC ALIGNER — notes ↔ syllables, edit by clicking"
   }
  ],
  "links": [
@@ -1256,7 +1334,7 @@
   ],
   [
    21,
-   5,
+   20,
    0,
    18,
    0,
@@ -1268,6 +1346,30 @@
    1,
    19,
    0,
+   "STRING"
+  ],
+  [
+   23,
+   5,
+   0,
+   20,
+   0,
+   "STRING"
+  ],
+  [
+   24,
+   6,
+   0,
+   20,
+   1,
+   "STRING"
+  ],
+  [
+   25,
+   3,
+   3,
+   20,
+   4,
    "STRING"
   ]
  ],

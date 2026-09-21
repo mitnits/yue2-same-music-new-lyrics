@@ -5,7 +5,7 @@ a recording is transcribed to an editable ABC score with [SheetSage2](https://hu
 then YuE2 renders that exact score with your lyrics, in your language, optionally an octave down or in another key.
 
 A **ComfyUI custom node pack** around ComfyUI's built-in YuE2 nodes: transcribe, edit the score on the canvas,
-fit-check the lyrics, transpose, render. Example workflows included; node reference in [NODES.md](NODES.md).
+fit-check the lyrics, align syllables to notes visually (no notation needed), transpose, render. Example workflows included; node reference in [NODES.md](NODES.md).
 
 Optional extras: a style-prompt drafter that listens to the recording (Audio Flamingo 3 + CLAP) and a language-aware
 syllable fit check.

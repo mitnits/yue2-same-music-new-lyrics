@@ -1,8 +1,8 @@
 {
  "id": "yue2-sml-stage2-generate",
  "revision": 0,
- "last_node_id": 16,
- "last_link_id": 19,
+ "last_node_id": 17,
+ "last_link_id": 21,
  "nodes": [
   {
    "id": 1,
@@ -23,7 +23,7 @@
    "title": "Stage 2",
    "properties": {},
    "widgets_values": [
-    "# Stage 2 · Generate from the edited score\n\n1. **Load Text File** reads `output/yue2-same-music-new-lyrics/edited_score.abc` written by Stage 1 (or point it at any `.abc`).\n2. A second **Score Editor** lets you tweak the score once more on this canvas (empty = pass through; it saves to `..._stage2.abc`).\n3. Paste the **new lyrics** (one `[Section]` per sung section, in order), pick the **song language**, write the **style prompt**. Section mismatches are logged unless `fail_on_mismatch` is on.\n4. Queue. mode `full` keeps the chords from the score; use **Strip Chords** + mode `melody` to let YuE2 re-harmonize.\n\nKSampler: 32 steps, cfg 1, dpm_2 / sgm_uniform. Model: `checkpoints/yue2_3b_bf16.safetensors`."
+    "# Stage 2 · Generate from the edited score\n\n1. **Load Text File** reads `output/yue2-same-music-new-lyrics/edited_score.abc` written by Stage 1 (or point it at any `.abc`).\n2. A second **Score Editor** lets you tweak the score once more on this canvas (empty = pass through; it saves to `..._stage2.abc`).\n3. Paste the **new lyrics**; use the **LYRIC ALIGNER** to see notes ↔ syllables and fix them by clicking (one `[Section]` per sung section, in order), pick the **song language**, write the **style prompt**. Section mismatches are logged unless `fail_on_mismatch` is on.\n4. Queue. mode `full` keeps the chords from the score; use **Strip Chords** + mode `melody` to let YuE2 re-harmonize.\n\nKSampler: 32 steps, cfg 1, dpm_2 / sgm_uniform. Model: `checkpoints/yue2_3b_bf16.safetensors`."
    ],
    "color": "#432",
    "bgcolor": "#653"
@@ -119,8 +119,7 @@
      "name": "abc",
      "type": "STRING",
      "links": [
-      2,
-      10
+      20
      ]
     },
     {
@@ -174,7 +173,8 @@
      "type": "STRING",
      "links": [
       3,
-      9
+      9,
+      21
      ]
     }
    ],
@@ -913,6 +913,86 @@
    "widgets_values": [
     "audio/yue2-same-music-new-lyrics"
    ]
+  },
+  {
+   "id": 17,
+   "type": "Yue2SmlLyricAligner",
+   "pos": [
+    -100,
+    -580
+   ],
+   "size": [
+    820,
+    560
+   ],
+   "flags": {},
+   "order": 17,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "abc",
+     "type": "STRING",
+     "link": 20
+    },
+    {
+     "name": "lyrics",
+     "type": "STRING",
+     "link": 21
+    },
+    {
+     "name": "language",
+     "type": "COMBO",
+     "widget": {
+      "name": "language"
+     },
+     "link": null
+    },
+    {
+     "name": "name",
+     "type": "STRING",
+     "widget": {
+      "name": "name"
+     },
+     "link": null
+    },
+    {
+     "name": "transcription_folder",
+     "type": "STRING",
+     "widget": {
+      "name": "transcription_folder"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "abc",
+     "type": "STRING",
+     "links": [
+      2,
+      10
+     ]
+    },
+    {
+     "name": "lyrics",
+     "type": "STRING",
+     "links": []
+    },
+    {
+     "name": "report",
+     "type": "STRING",
+     "links": []
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "Yue2SmlLyricAligner"
+   },
+   "widgets_values": [
+    "English",
+    "my_song",
+    ""
+   ],
+   "title": "LYRIC ALIGNER — notes ↔ syllables, edit by clicking"
   }
  ],
  "links": [
@@ -926,7 +1006,7 @@
   ],
   [
    2,
-   3,
+   17,
    0,
    5,
    0,
@@ -990,7 +1070,7 @@
   ],
   [
    10,
-   3,
+   17,
    0,
    11,
    3,
@@ -1067,6 +1147,22 @@
    16,
    0,
    "AUDIO"
+  ],
+  [
+   20,
+   3,
+   0,
+   17,
+   0,
+   "STRING"
+  ],
+  [
+   21,
+   4,
+   0,
+   17,
+   1,
+   "STRING"
   ]
  ],
  "groups": [],
