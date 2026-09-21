@@ -188,23 +188,40 @@ def register_routes():
         payload["abc"] = abc
         return web.json_response(payload)
 
-    @routes.post("/yue2sml/linestart")
-    async def linestart(request):
-        """Pin (or unpin) where a lyric line starts: {name, section, line, pos|null}. pos = absolute start units."""
+    @routes.post("/yue2sml/reflow")
+    async def reflow(request):
+        """Move one note across a line boundary: {name, section, line, delta} moves the START of `line` by delta notes
+        (+1 = give this line's first note to the line above, -1 = take the last note of the line above).
+        {name, section, reset: true} returns the section to the automatic split."""
         body = await request.json()
         name = body["name"]
         state = load_state(name) or {}
-        ls = state.setdefault("line_starts", {})
-        sec, line = str(int(body["section"])), str(int(body["line"]))
-        if body.get("pos") is None:
-            ls.get(sec, {}).pop(line, None)
-        else:
-            ls.setdefault(sec, {})[line] = int(body["pos"])
-        save_state(name, state)
         abc = state.get("edited_abc") or state["base_abc"]
+        ls = state.setdefault("line_starts", {})
+        sec = str(int(body["section"]))
+        if body.get("reset"):
+            ls.pop(sec, None); msg = "line split back to automatic"
+        else:
+            view = view_payload(name, abc)
+            section = view["sections"][int(sec)]
+            starts = list(section["starts"])
+            n = sum(L["note_count"] for L in section["lines"]) + len(section["lead_in"])
+            k, delta = int(body["line"]), int(body["delta"])
+            if not 1 <= k < len(starts):
+                return web.json_response({"error": "the first line always starts at the first note"}, status=400)
+            new = starts[k] + delta
+            lo = starts[k - 1] + 1
+            hi = (starts[k + 1] - 1) if k + 1 < len(starts) else n - 1
+            if new < lo or new > hi:
+                return web.json_response({"error": "that would leave a line with no notes"}, status=400)
+            starts[k] = new
+            notes = [nn for L in section["lines"] for nn in L["notes"]]
+            notes = sorted(section["lead_in"] + notes, key=lambda x: x["id"])
+            ls[sec] = [notes[o]["start"] for o in starts]
+            msg = ("gave a note to the line above" if delta > 0 else "took a note from the line above")
+        save_state(name, state)
         payload = view_payload(name, abc)
-        payload["abc"] = abc
-        payload["msg"] = "line start pinned" if body.get("pos") is not None else "line start unpinned"
+        payload.update({"abc": abc, "msg": msg})
         return web.json_response(payload)
 
     @routes.get("/yue2sml/audio")

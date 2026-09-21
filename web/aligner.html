@@ -49,10 +49,7 @@
   <button data-op="up" title="One scale step higher, stays in key (↑)">↑ Up</button>
   <button data-op="down" title="One scale step lower, stays in key (↓)">↓ Down</button>
   <button data-op="silence" title="Turn this note into a rest (X)">✕ Silence</button>
-  <span style="border-left:1px solid var(--line); height:20px"></span>
-  <button id="pin-this" title="Pin: the selected note is where ITS line starts (notes before it move to the previous line)">⇤ Line starts here</button>
-  <button id="pin-next" title="Pin: the selected note is where the NEXT line starts">Next line starts here ⇥</button>
-  <span class="hint">Click a note to select · click a dark rest to add a pickup note · ▶ per line plays just that line · everything saves by itself; queue the workflow again to render</span>
+  <span class="hint">Click a note to select · click a dark rest to add a pickup note · use a line's ↑↓ buttons to move notes between lines (reflow) · everything saves by itself; queue the workflow again to render</span>
 </div>
 <main>
   <div id="lyricsbox">
@@ -99,7 +96,8 @@ function render(){
     const bad = sec.lines.filter(L => L.overflow.length || L.note_count - L.syllable_count > 2).length;
     const st = !sec.tag ? '<span class="st bad">no lyrics section for this part of the score</span>'
              : bad ? `<span class="st bad">${bad} line${bad>1?"s":""} to fix</span>` : '<span class="st good">all lines fit</span>';
-    el.innerHTML = `<h3>${sec.name} <span class="st">${sec.note_count} notes</span> ↔ ${sec.tag ? "["+sec.tag+"]" : ""} <span class="st">${sec.syllable_count} syllables</span> ${st}</h3>`;
+    el.innerHTML = `<h3>${sec.name} <span class="st">${sec.note_count} notes</span> ↔ ${sec.tag ? "["+sec.tag+"]" : ""} <span class="st">${sec.syllable_count} syllables</span> ${st} ${sec.manual ? '<button class="small" data-auto="1" title="Forget the manual reflow of this section and split notes proportionally again">auto split</button>' : '<span class="st">auto split</span>'}</h3>`;
+    const autoBtn = el.querySelector("[data-auto]"); if (autoBtn) autoBtn.addEventListener("click", () => reflow(sec.index, null, null, true));
     if (sec.lead_in.length) el.appendChild(lineRow(sec, {index:-1, chips:[], notes:sec.lead_in, note_count:sec.lead_in.length, syllable_count:0, overflow:[], pinned:false}, pxu, "lead-in (no lyrics)"));
     if (!sec.lines.length && sec.notes && sec.notes.length) el.appendChild(lineRow(sec, {index:-1, chips:[], notes:sec.notes, note_count:sec.notes.length, syllable_count:0, overflow:[], pinned:false}, pxu, "no lyrics for this section"));
     sec.lines.forEach(L => el.appendChild(lineRow(sec, L, pxu)));
@@ -107,7 +105,7 @@ function render(){
   });
   if (S.extra_lyric_sections.length) { const d = document.createElement("div"); d.className="legend over"; d.textContent = `Lyrics sections with no sung part in the score: ${S.extra_lyric_sections.join(", ")}`; root.appendChild(d); }
   const legend = document.createElement("div"); legend.className = "legend";
-  legend.textContent = "Blue = note with its syllable · grey = held note (~, the syllable continues) · dark gaps = rests (click to add a pickup note) · height = pitch · lines are matched to phrases at the singer's breaths; pin a start if it guessed wrong";
+  legend.textContent = "Blue = note with its syllable · grey = held note (~, the syllable continues) · dark gaps = pauses/rests, played as silence (click one to add a pickup note) · height = pitch · notes are split across lines in proportion to syllables (snapping to a nearby rest) — use ↑↓ take/give on a line to move notes across the boundary";
   root.appendChild(legend);
 }
 
@@ -118,15 +116,25 @@ function lineRow(sec, L, pxu, label){
   let status = label ? `<span class="st">${label}</span>` :
       L.overflow.length ? `<span class="st bad">${L.overflow.length} syllable${L.overflow.length>1?"s":""} without a note: <span class="over">${L.overflow.join(" ")}</span></span>` :
       d > 2 ? `<span class="st">${d} held notes (~)</span>` : d > 0 ? `<span class="st good">fits (${d} held)</span>` : `<span class="st good">fits</span>`;
-  if (L.pinned) status += ' <span class="st pin">pinned</span>';
+  const last = L.index >= 0 && L.index === sec.lines.length - 1, first = L.index === 0;
+  const reflowBtns = L.index < 0 ? "" : `<span style="border-left:1px solid var(--line); height:16px; margin:0 2px"></span>
+      <button class="small" data-reflow="-1" title="Take the last note of the line above into this line" ${first ? "disabled" : ""}>↑ take</button>
+      <button class="small" data-reflow="+1" title="Give this line's first note to the line above" ${first ? "disabled" : ""}>↑ give</button>
+      <button class="small" data-reflow="next-1" title="Give this line's last note to the line below" ${last ? "disabled" : ""}>↓ give</button>
+      <button class="small" data-reflow="next+1" title="Take the first note of the line below into this line" ${last ? "disabled" : ""}>↓ take</button>`;
   head.innerHTML = `<div class="txt">${L.index >= 0 ? "<b>"+(L.index+1)+".</b>" : ""}${L.chips.length ? L.chips.join("·") : ""}</div>
     <div class="row"><span class="st">${L.note_count} notes ↔ ${L.syllable_count} syl</span> ${status}</div>
     <div class="row"><button class="small" data-play="synth" title="Play just this line as a simple synth (space)">▶ line</button>
-      <button class="small" data-play="orig" title="Play the original recording for this line's bars" ${S.has_audio && S.bar_times.length ? "" : "disabled"}>▶ original</button>
-      ${L.index > 0 && L.pinned ? '<button class="small" data-unpin="1" title="Let the matcher choose this line\'s start again">unpin</button>' : ""}</div>`;
+      <button class="small" data-play="orig" title="Play the original recording for this line's bars" ${S.has_audio && S.bar_times.length ? "" : "disabled"}>▶ original</button>${reflowBtns}</div>`;
   head.querySelector('[data-play="synth"]').addEventListener("click", () => playSynth(L.notes));
   head.querySelector('[data-play="orig"]').addEventListener("click", () => playOriginal(L.notes));
-  const unpin = head.querySelector("[data-unpin]"); if (unpin) unpin.addEventListener("click", () => pin(sec.index, L.index, null));
+  head.querySelectorAll("[data-reflow]").forEach(b => b.addEventListener("click", () => {
+    const v = b.dataset.reflow;
+    if (v === "-1") reflow(sec.index, L.index, -1);          // my start moves one note earlier
+    else if (v === "+1") reflow(sec.index, L.index, +1);     // my start moves one note later
+    else if (v === "next-1") reflow(sec.index, L.index + 1, -1);  // next line's start moves earlier: I give my last note
+    else reflow(sec.index, L.index + 1, +1);                 // next line's start moves later: I take its first note
+  }));
   row.appendChild(head);
   row.appendChild(roll(L.notes, pxu));
   return row;
@@ -149,7 +157,8 @@ function roll(notes, pxu){
     const t = document.createElementNS(NS, "text"); t.setAttribute("x", x+3); t.setAttribute("y", 12); t.setAttribute("class", "bar"); t.textContent = `bar ${b.index+1}`; svg.appendChild(t);
     S.rests.filter(r => r.bar === b.index).forEach(r => {
       const rr = document.createElementNS(NS, "rect"); rr.setAttribute("x", 12 + (r.start - x0)*pxu); rr.setAttribute("y", 16); rr.setAttribute("width", Math.max(2, r.dur*pxu-1)); rr.setAttribute("height", H-64); rr.setAttribute("class", "rest");
-      rr.addEventListener("click", () => sing(r)); const tt = document.createElementNS(NS, "title"); tt.textContent = "rest: click to add a pickup note here"; rr.appendChild(tt); svg.appendChild(rr);
+      rr.addEventListener("click", () => sing(r)); const tt = document.createElementNS(NS, "title"); tt.textContent = `pause of ${r.dur} units (${(r.dur*secondsPerUnit()).toFixed(2)} s): click to add a pickup note here`; rr.appendChild(tt); svg.appendChild(rr);
+      if (r.dur * pxu >= 22) { const pt = document.createElementNS(NS, "text"); pt.setAttribute("x", 12 + (r.start - x0)*pxu + 2); pt.setAttribute("y", H-8); pt.setAttribute("class", "bar"); pt.textContent = r.dur >= S.beat ? "pause" : "·"; svg.appendChild(pt); }
     });
     x += b.units*pxu;
   });
@@ -173,7 +182,7 @@ function select(id){
   selected = id; const n = noteById(id); const where = lineOf(id);
   $("selinfo").textContent = n ? `#${id} ${n.name}, ${n.dur} units, bar ${n.bar+1}${where ? `, line ${where.line.index+1}` : ""}, "${n.syllable.text}"` : "none";
   document.querySelectorAll("rect.note").forEach(r => r.classList.toggle("sel", Number(r.dataset.id) === id));
-  const ok = !!where; $("pin-this").disabled = !ok || where.line.index === 0; $("pin-next").disabled = !ok || where.line.index >= where.sec.lines.length - 1;
+
 }
 function applyPayload(r, msg){ S = Object.assign(S, r); meta(); render(); if (selected !== null && noteById(selected)) select(selected); if (msg !== undefined) say(msg); }
 
@@ -189,9 +198,10 @@ async function sing(r){
   catch(e){ history.pop(); say(e.message, true); }
 }
 async function setAbc(abc){ try { applyPayload(await api("/yue2sml/set", {name: NAME, abc}), abc === null ? "back to the transcription" : "undone"); } catch(e){ say(e.message, true); } }
-async function pin(section, line, pos){ try { applyPayload(await api("/yue2sml/linestart", {name: NAME, section, line, pos}), pos === null ? "line start unpinned" : "line start pinned"); } catch(e){ say(e.message, true); } }
-$("pin-this").addEventListener("click", () => { const w = selected !== null && lineOf(selected); if (w) pin(w.sec.index, w.line.index, noteById(selected).start); });
-$("pin-next").addEventListener("click", () => { const w = selected !== null && lineOf(selected); if (w) pin(w.sec.index, w.line.index + 1, noteById(selected).start); });
+async function reflow(section, line, delta, reset){
+  try { const r = await api("/yue2sml/reflow", reset ? {name: NAME, section, reset: true} : {name: NAME, section, line, delta}); applyPayload(r, r.msg); }
+  catch(e){ say(e.message, true); }
+}
 
 // ---- playback
 function stopAll(){ if (audioEl) audioEl.pause(); synthTimers.forEach(clearTimeout); synthTimers = []; document.querySelectorAll("rect.play").forEach(r=>r.classList.remove("play")); }
@@ -208,8 +218,9 @@ function playSynth(notes){
   stopAll(); if (!notes.length) return;
   if (!synthCtx) synthCtx = new (window.AudioContext || window.webkitAudioContext)();
   const spu = secondsPerUnit(), t = synthCtx.currentTime + 0.05, start0 = notes[0].start;
-  notes.forEach(n => {
+  notes.forEach((n, i) => {
     const at = t + (n.start - start0)*spu, dur = n.dur*spu;
+    if (i > 0) { const prev = notes[i-1], gap = n.start - (prev.start + prev.dur); if (gap >= S.beat / 2) synthTimers.push(setTimeout(() => say(`… pause ${(gap*spu).toFixed(2)} s …`), (t + (prev.start + prev.dur - start0)*spu - synthCtx.currentTime)*1000)); }
     const o = synthCtx.createOscillator(), g = synthCtx.createGain();
     o.type = "triangle"; o.frequency.value = 440 * Math.pow(2, (n.pitch-69)/12);
     g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(0.25, at+0.02); g.gain.exponentialRampToValueAtTime(0.0001, at+Math.max(0.05, dur*0.95));
@@ -222,7 +233,7 @@ function playSynth(notes){
 
 document.querySelectorAll("#toolbar button[data-op]").forEach(b => b.addEventListener("click", () => doOp(b.dataset.op)));
 $("undo").addEventListener("click", () => { if (!history.length) { say("nothing to undo"); return; } setAbc(history.pop()); });
-$("reset").addEventListener("click", () => { if (confirm("Discard all note edits and go back to the transcription? (pinned line starts are kept)")) { history = []; setAbc(null); } });
+$("reset").addEventListener("click", () => { if (confirm("Discard all note edits and go back to the transcription? (your line reflow is kept)")) { history = []; setAbc(null); } });
 $("editlyrics").addEventListener("click", () => { const b = $("lyricsbox"); b.style.display = b.style.display === "block" ? "none" : "block"; });
 $("applylyrics").addEventListener("click", async () => { try { applyPayload(await api("/yue2sml/lyrics", {name: NAME, lyrics: $("lyrics").value, language: $("language").value}), "lyrics updated for the alignment view"); } catch(e){ say(e.message, true); } });
 $("stop").addEventListener("click", stopAll);
