@@ -392,6 +392,26 @@ def section_events(model: Model, sec_notes: list, rests: list) -> list:
     return evs
 
 
+def spread_untagged(chips: list, secs: list) -> list:
+    """Lyrics without [Section] tags arrive as one block. Spread its lines over the score's sung sections in
+    proportion to each section's note count (contiguous lines, at least one per section while lines last)."""
+    if len(chips) != 1 or len(secs) <= 1 or chips[0]["tag"] != "untagged":
+        return chips
+    lines = chips[0]["lines"]
+    weights = [len(s["notes"]) for s in secs]
+    total = sum(weights) or len(secs)
+    out, cursor = [], 0
+    for i, sec in enumerate(secs):
+        if i == len(secs) - 1:
+            take = len(lines) - cursor
+        else:
+            take = max(1, round(len(lines) * weights[i] / total))
+            take = min(take, max(0, len(lines) - cursor - (len(secs) - 1 - i)))
+        out.append({"tag": sec["name"], "lines": lines[cursor:cursor + take]})
+        cursor += take
+    return out
+
+
 def align(model: Model, lyrics: str, language: str, line_starts: dict | None = None) -> dict:
     """Section by section: lyric lines own a contiguous run of EVENTS (sung notes and the pauses between them);
     syllables are assigned to the notes of each line in order.
@@ -401,6 +421,7 @@ def align(model: Model, lyrics: str, language: str, line_starts: dict | None = N
     notes = sung_notes(model)
     secs = sections(model)
     chips = lyric_chips(lyrics, language)
+    chips = spread_untagged(chips, secs)
     rests = rests_view(model)
     beat = max(1, model.unit_den // 4)
     view_sections = []
