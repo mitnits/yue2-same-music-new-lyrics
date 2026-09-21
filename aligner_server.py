@@ -215,15 +215,29 @@ def register_routes():
             k, delta = int(body["line"]), int(body["delta"])
             if not 1 <= k < len(starts):
                 return web.json_response({"error": "the first line always starts at the first note"}, status=400)
-            new = starts[k] + delta
-            lo = starts[k - 1] + 1
-            hi = (starts[k + 1] - 1) if k + 1 < len(starts) else n - 1
-            if new < lo or new > hi:
-                return web.json_response({"error": "that would leave a line completely empty (no notes and no pauses)"}, status=400)
-            starts[k] = new
-            ls[sec] = [section["event_starts"][o] for o in starts]
-            moved = "pause" if section["event_starts"] and view["sections"][int(sec)] and _kind_at(view["sections"][int(sec)], starts[k] if delta < 0 else starts[k] - 1) == "rest" else "note"
-            msg = (f"gave a {moved} to the line above" if delta > 0 else f"took a {moved} from the line above")
+            if delta < 0:
+                # boundaries glued to this one (empty lines above) move along, so a take passes through them
+                j = k
+                while j - 1 >= 1 and starts[j - 1] == starts[k]:
+                    j -= 1
+                if starts[k] - 1 < (starts[j - 1] if j - 1 >= 0 else 0) or starts[k] - 1 < 0:
+                    return web.json_response({"error": "nothing left above to take: this is already the first note of the section"}, status=400)
+                for t in range(j, k + 1):
+                    starts[t] -= 1
+            else:
+                j = k
+                while j + 1 < len(starts) and starts[j + 1] == starts[k]:
+                    j += 1
+                limit = starts[j + 1] if j + 1 < len(starts) else n
+                if starts[k] + 1 > limit:
+                    return web.json_response({"error": "nothing left below to give: the section has no more notes"}, status=400)
+                for t in range(k, j + 1):
+                    starts[t] += 1
+            es = section["event_starts"]
+            last_end = (es[-1] + 1) if es else 0
+            ls[sec] = [es[o] if o < len(es) else last_end for o in starts]
+            moved = "pause" if _kind_at(section, starts[k] if delta < 0 else starts[k] - 1) == "rest" else "note"
+            msg = (f"moved a {moved} up into line {k}" if delta > 0 else f"moved a {moved} down into line {k + 1}")
         save_state(name, state)
         payload = view_payload(name, abc)
         payload.update({"abc": abc, "msg": msg})

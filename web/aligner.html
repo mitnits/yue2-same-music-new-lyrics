@@ -114,6 +114,7 @@ function lineRow(sec, L, pxu, label){
   const head = document.createElement("div"); head.className = "head";
   const d = L.note_count - L.syllable_count;
   let status = label ? `<span class="st">${label}</span>` :
+      L.event_count === 0 ? `<span class="st bad">no notes yet — use ↑ take or ↓ take to pull some in</span>` :
       L.overflow.length ? `<span class="st bad">${L.overflow.length} syllable${L.overflow.length>1?"s":""} without a note: <span class="over">${L.overflow.join(" ")}</span></span>` :
       d > 2 ? `<span class="st">${d} held notes (~)</span>` : d > 0 ? `<span class="st good">fits (${d} held)</span>` : `<span class="st good">fits</span>`;
   const last = L.index >= 0 && L.index === sec.lines.length - 1, first = L.index === 0;
@@ -143,7 +144,7 @@ function lineRow(sec, L, pxu, label){
 function roll(events, pxu){
   const wrap = document.createElement("div"); wrap.className = "roll";
   const notes = events.filter(e => e.kind !== "rest"), rests = events.filter(e => e.kind === "rest");
-  if (!events.length) return wrap;
+  if (!events.length) { const d = document.createElement("div"); d.className = "st"; d.style.padding = "12px 0"; d.textContent = "(empty)"; wrap.appendChild(d); return wrap; }
   if (!notes.length) { const d = document.createElement("div"); d.className = "st"; d.textContent = "only a pause in this line"; wrap.appendChild(d); }
   const firstBar = Math.min(...events.map(n=>n.bar)), lastBar = Math.max(...events.map(n=>n.bar));
   const x0 = S.bars.slice(0, firstBar).reduce((a,b)=>a+b.units, 0);

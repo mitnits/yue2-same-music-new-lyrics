@@ -419,8 +419,8 @@ def align(model: Model, lyrics: str, language: str, line_starts: dict | None = N
                 off = next((j for j, e in enumerate(events) if e["start"] >= pos), len(events)) if pos is not None else (offs[-1] + 1 if offs else 0)
                 offs.append(off)
             offs[0] = 0
-            for j in range(1, len(offs)):
-                offs[j] = min(max(offs[j], offs[j - 1] + 1), len(events))
+            for j in range(1, len(offs)):  # non-decreasing: equal offsets = an empty line (no notes yet)
+                offs[j] = min(max(offs[j], offs[j - 1]), len(events))
             starts_list = offs
         else:
             note_starts = auto_starts(sec_notes, [len(l) for l in lines], beat)
