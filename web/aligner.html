@@ -5,26 +5,27 @@
 <title>Lyric Aligner</title>
 <style>
   :root { color-scheme: dark; --bg:#1e1e22; --panel:#26262b; --line:#3a3a42; --text:#e8e8ec; --muted:#9a9aa6;
-          --note:#4f8cff; --sel:#ffb454; --mel:#6d6d78; --over:#ff5c5c; --rest:#2f2f36; --ok:#5fd18a; --pin:#c78bff; }
-  * { box-sizing:border-box } body { margin:0; font:13px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text) }
+          --note:#4f8cff; --sel:#ffb454; --mel:#6d6d78; --over:#ff5c5c; --rest:#2f2f36; --ok:#5fd18a; }
+  * { box-sizing:border-box } body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text) }
   header { position:sticky; top:0; z-index:3; background:var(--panel); border-bottom:1px solid var(--line); padding:8px 12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap }
   header .name { font-weight:600 } .muted { color:var(--muted) }
-  button { background:#3b3b44; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:4px 9px; cursor:pointer; font:inherit }
-  button:hover { background:#4a4a55 } button:disabled { opacity:.4; cursor:default } button.primary { background:#2f5fbf; border-color:#3b6fd6 } button.small { padding:2px 7px; font-size:12px }
-  #toolbar { position:sticky; top:44px; z-index:2; background:var(--panel); border-bottom:1px solid var(--line); padding:6px 12px; display:flex; gap:6px; align-items:center; flex-wrap:wrap }
-  #toolbar .hint { color:var(--muted); margin-left:auto }
+  button { background:#3b3b44; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 10px; cursor:pointer; font:inherit }
+  button:hover { background:#4a4a55 } button:disabled { opacity:.4; cursor:default } button.small { padding:2px 8px; font-size:13px }
+  #toolbar { position:sticky; top:46px; z-index:2; background:var(--panel); border-bottom:1px solid var(--line); padding:6px 12px; display:flex; gap:6px; align-items:center; flex-wrap:wrap }
+  #toolbar .hint { color:var(--muted); margin-left:auto; font-size:13px }
   main { padding:10px 12px 60px }
   section.sec { background:var(--panel); border:1px solid var(--line); border-radius:8px; margin:10px 0; padding:8px 10px }
-  section.sec h3 { margin:0 0 4px; font-size:14px; display:flex; gap:10px; align-items:baseline; flex-wrap:wrap }
-  .st { font-weight:400; color:var(--muted) } .st.bad { color:var(--over) } .st.good { color:var(--ok) } .st.pin { color:var(--pin) }
-  .line { display:grid; grid-template-columns: 360px 1fr; gap:10px; align-items:center; border-top:1px solid var(--line); padding:8px 0 }
-  .line .head { display:flex; flex-direction:column; gap:4px } .line .head .txt { font-size:13px } .line .head .txt b { color:var(--muted); font-weight:500; margin-right:4px }
-  .line .head .row { display:flex; gap:4px; flex-wrap:wrap; align-items:center }
+  section.sec h3 { margin:0 0 4px; font-size:15px; display:flex; gap:10px; align-items:baseline; flex-wrap:wrap }
+  .st { font-weight:400; color:var(--muted) } .st.bad { color:var(--over) } .st.good { color:var(--ok) }
+  .line { display:grid; grid-template-columns: 380px 1fr; gap:10px; align-items:center; border-top:1px solid var(--line); padding:8px 0 }
+  .line .head { display:flex; flex-direction:column; gap:4px }
+  .line .head input { width:100%; background:#141416; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:4px 6px; font:inherit }
+  .line .head .row { display:flex; gap:4px; flex-wrap:wrap; align-items:center; font-size:13px }
   .roll { overflow-x:auto; padding-bottom:2px }
-  svg { display:block } text { font:12px system-ui, sans-serif; fill:var(--text) } text.syl { font-size:14px } text.mel { fill:var(--muted) } text.bar { fill:var(--muted); font-size:10px }
+  svg { display:block } text { font:12px system-ui, sans-serif; fill:var(--text) } text.syl { font-size:14px } text.mel { fill:var(--muted) } text.bar { fill:var(--muted); font-size:11px }
   rect.note { fill:var(--note); stroke:#1b3a80; cursor:pointer } rect.note.mel { fill:var(--mel); stroke:#444 } rect.note.sel { fill:var(--sel); stroke:#8a5a00 } rect.note.play { fill:#9be0ff }
   rect.rest { fill:var(--rest); stroke:none; cursor:pointer } rect.rest:hover { fill:#3d3d47 }
-  .legend { color:var(--muted); font-size:12px; margin:8px 0 0 }
+  .legend { color:var(--muted); font-size:13px; margin:8px 0 0 }
   #msg { color:var(--muted) } #msg.err { color:var(--over) }
   #lyricsbox { display:none; margin:10px 0 } textarea { width:100%; min-height:160px; background:#141416; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:8px; font:13px/1.4 ui-monospace, monospace }
   .over { color:var(--over) }
@@ -36,12 +37,7 @@
   <span class="muted" id="meta"></span>
   <button id="undo" title="Undo the last note change (Ctrl+Z)">↶ Undo</button>
   <button id="reset" title="Back to the transcription, discarding all note edits">Reset notes</button>
-  <button id="editlyrics" title="Edit the lyrics used for the syllables, and the original lyrics for timing">Lyrics…</button>
-  <label class="muted" title="How lyric lines are matched to notes">match lines: <select id="mode">
-    <option value="auto">by syllable count (guess)</option>
-    <option value="recording">from the recording (timed)</option>
-    <option value="off">off — show notes uniformly</option></select></label>
-  <button id="timebtn" title="Whisper listens to the recording and times each ORIGINAL lyric line; new lyrics then map onto those lines">⏱ Time lyrics from recording</button>
+  <button id="editlyrics" title="Edit all lyrics as text">Lyrics…</button>
   <button id="stop" title="Stop playback">■ Stop</button>
   <label class="muted" title="Width of the note blocks">zoom <input id="zoom" type="range" min="4" max="28" step="1" style="vertical-align:middle;width:90px"></label>
   <span id="msg"></span>
@@ -51,22 +47,19 @@
   <button data-op="split" title="One note becomes two of the same pitch: room for one more syllable (S)">✂ Split</button>
   <button data-op="merge" title="This note swallows the next one: one syllable fewer (M)">⇢ Merge with next</button>
   <button data-op="longer" title="Take a little time from what follows in the bar (+)">＋ Longer</button>
-  <button data-op="shorter" title="Give a little time to a rest after this note (−)">－ Shorter</button>
+  <button data-op="shorter" title="Give a little time to a pause after this note (−)">－ Shorter</button>
   <button data-op="up" title="One scale step higher, stays in key (↑)">↑ Up</button>
   <button data-op="down" title="One scale step lower, stays in key (↓)">↓ Down</button>
-  <button data-op="silence" title="Turn this note into a rest (X)">✕ Silence</button>
-  <span class="hint">Click a note to select · click a dark rest to add a pickup note · use a line's ↑↓ buttons to move notes between lines (reflow) · everything saves by itself; queue the workflow again to render</span>
+  <button data-op="silence" title="Turn this note into a pause (X)">✕ Silence</button>
+  <span class="hint">Syllables fill the notes in order, line after line. Click a note to select it · click a dark pause to add a pickup note · everything saves by itself; queue the workflow again to render</span>
 </div>
 <main>
   <div id="lyricsbox">
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
-      <div><div class="muted">NEW lyrics (what will be sung)</div><textarea id="lyrics"></textarea></div>
-      <div><div class="muted">ORIGINAL lyrics of the recording (for timing; language: <select id="origlang"><option value="">auto-detect</option></select>)</div><textarea id="origlyrics"></textarea></div>
-    </div>
+    <textarea id="lyrics"></textarea>
     <div style="margin-top:6px; display:flex; gap:8px; align-items:center">
-      <label>Language of the new lyrics <select id="language"></select></label>
-      <button id="applylyrics" class="primary">Apply</button>
-      <span class="muted">Hyphenate a word (ev-ery) to force how it splits into syllables. Paste the same NEW lyrics into ComfyUI's NEW LYRICS box before rendering.</span>
+      <label>Language <select id="language"></select></label>
+      <button id="applylyrics">Apply</button>
+      <span class="muted">Hyphenate a word (ev-ery) to force how it splits. Lyrics edited here flow out of the node's lyrics output.</span>
     </div>
   </div>
   <div id="sections"></div>
@@ -84,24 +77,17 @@ async function api(path, body){
   const r = await fetch(path, body ? {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)} : {});
   const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText); return j;
 }
-function meta(){ $("meta").textContent = `key ${S.key} · ${S.bpm} BPM · ${S.language}${S.edited ? " · EDITED" : ""}${modeMeta()}`; }
+function meta(){ $("meta").textContent = `key ${S.key} · ${S.bpm} BPM · ${S.language}${S.edited ? " · notes EDITED" : ""}${S.lyrics_edited ? " · lyrics edited here" : ""}`; }
 async function load(){
   try { S = await api(`/yue2sml/session?name=${encodeURIComponent(NAME)}`); } catch(e){ say(e.message, true); return; }
-  $("title").textContent = `Lyric Aligner · ${S.name}`; meta();
+  $("title").textContent = `Lyric Aligner · ${S.name}`;
   const sel = $("language"); if (!sel.options.length) LANGS.forEach(l => { const o=document.createElement("option"); o.value=o.textContent=l; sel.appendChild(o); });
   sel.value = S.language; $("lyrics").value = S.lyrics;
-  const ol = $("origlang"); if (ol.options.length === 1) LANGS.forEach(l => { const o=document.createElement("option"); o.value=o.textContent=l; ol.appendChild(o); });
-  if (S.original_lyrics !== undefined) $("origlyrics").value = S.original_lyrics;
   if (!$("zoom").dataset.init) { $("zoom").value = Math.max(6, Math.min(24, Math.round(10 * 32 / S.unit_den))); $("zoom").dataset.init = "1"; try { const z = localStorage.getItem("yue2sml.zoom"); if (z) $("zoom").value = z; } catch(e){} }
-  $("mode").value = S.mode || "auto";
-  $("mode").querySelector('[value="recording"]').disabled = !S.has_timing;
-  $("timebtn").disabled = !S.timing_available;
-  $("timebtn").title = S.timing_available ? "Whisper listens to the recording and times each ORIGINAL lyric line (about a minute)" : "needs the recording (connect Transcribe's folder) and setup.sh --extras (Whisper)";
-  render();
+  meta(); render();
 }
-function modeMeta(){ const m = S.mode || "auto"; const ti = S.timing_info; return m === "recording" && ti ? ` · timed ${ti.matched}/${ti.total} words` : ""; }
 function secondsPerUnit(){ return (60 / S.bpm) * (4 / S.unit_den); }
-function allNotes(){ const out=[]; for (const s of S.sections){ for (const L of s.lines) out.push(...L.notes); out.push(...s.lead_in); out.push(...(s.notes||[])); } return out.sort((a,b)=>a.id-b.id); }
+function allNotes(){ const out=[]; for (const s of S.sections) for (const L of s.lines) out.push(...L.notes); return out.sort((a,b)=>a.id-b.id); }
 function noteById(id){ return allNotes().find(n=>n.id===id) || null; }
 function lineOf(id){ for (const s of S.sections) for (const L of s.lines) if (L.notes.some(n=>n.id===id)) return {sec:s, line:L}; return null; }
 
@@ -110,64 +96,55 @@ function render(){
   const pxu = Number($("zoom").value) || 12;
   S.sections.forEach(sec => {
     const el = document.createElement("section"); el.className = "sec";
-    const diff = sec.syllable_count - sec.note_count;
-    const bad = sec.lines.filter(L => L.overflow.length || L.note_count - L.syllable_count > 2).length;
-    const st = !sec.tag ? '<span class="st bad">no lyrics section for this part of the score</span>'
-             : bad ? `<span class="st bad">${bad} line${bad>1?"s":""} to fix</span>` : '<span class="st good">all lines fit</span>';
-    el.innerHTML = `<h3>${sec.name} <span class="st">${sec.note_count} notes</span> ↔ ${sec.tag ? "["+sec.tag+"]" : ""} <span class="st">${sec.syllable_count} syllables</span> ${st} ${sec.manual ? '<button class="small" data-auto="1" title="Forget the manual reflow of this section and split notes proportionally again">auto split</button>' : '<span class="st">auto split</span>'}</h3>`;
-    const autoBtn = el.querySelector("[data-auto]"); if (autoBtn) autoBtn.addEventListener("click", () => reflow(sec.index, null, null, true));
-    if (sec.time_span && sec.time_span[0] != null) el.querySelector("h3").insertAdjacentHTML("beforeend", `<span class="st">${sec.time_span[0]}–${sec.time_span[1]} s</span>`);
-    if (sec.leftover_syllables && sec.leftover_syllables.length) el.querySelector("h3").insertAdjacentHTML("beforeend", `<span class="st bad">${sec.leftover_syllables.length} syllables beyond the last note</span>`);
-    if (sec.lead_in.length) el.appendChild(lineRow(sec, {index:-1, chips:[], notes:sec.lead_in, note_count:sec.lead_in.length, syllable_count:0, overflow:[], pinned:false}, pxu, "lead-in (no lyrics)"));
-    if (!sec.lines.length && sec.notes && sec.notes.length) el.appendChild(lineRow(sec, {index:-1, chips:[], notes:sec.notes, note_count:sec.notes.length, syllable_count:0, overflow:[], pinned:false}, pxu, "no lyrics for this section"));
+    const over = sec.lines.reduce((a,L)=>a+L.overflow.length, 0);
+    const held = sec.lines.filter(L=>L.held).reduce((a,L)=>a+L.note_count, 0);
+    const st = !sec.tag ? '<span class="st bad">no lyrics for this part of the score</span>'
+             : over ? `<span class="st bad">${over} syllable${over>1?"s":""} without a note</span>` : (held ? `<span class="st">${held} notes left over (held)</span>` : '<span class="st good">fits</span>');
+    el.innerHTML = `<h3>${sec.name} <span class="st">${sec.note_count} notes</span> ↔ ${sec.tag ? "["+sec.tag+"]" : ""} <span class="st">${sec.syllable_count} syllables</span> ${st}
+      <button class="small" data-addfirst="1" title="Add an empty line at the top of this section">+ line at top</button></h3>`;
+    el.querySelector("[data-addfirst]").addEventListener("click", () => lineOp(sec.index, -1, "insert"));
     sec.lines.forEach(L => el.appendChild(lineRow(sec, L, pxu)));
     root.appendChild(el);
   });
   if (S.extra_lyric_sections.length) { const d = document.createElement("div"); d.className="legend over"; d.textContent = `Lyrics sections with no sung part in the score: ${S.extra_lyric_sections.join(", ")}`; root.appendChild(d); }
   const legend = document.createElement("div"); legend.className = "legend";
-  legend.textContent = "Blue = note with its syllable · grey = held note (~, the syllable continues) · dark gaps = pauses/rests, played as silence (click one to add a pickup note) · height = pitch · notes are split across lines in proportion to syllables (snapping to a nearby rest) — use ↑↓ take/give on a line to move one note or pause across the boundary";
+  legend.textContent = "Blue = note with its syllable · grey = held note (~, the syllable continues) · dark gaps = pauses, played as silence (click one to add a pickup note) · height = pitch";
   root.appendChild(legend);
 }
 
-function lineRow(sec, L, pxu, label){
+function lineRow(sec, L, pxu){
   const row = document.createElement("div"); row.className = "line";
   const head = document.createElement("div"); head.className = "head";
-  const d = L.note_count - L.syllable_count;
-  let status = label ? `<span class="st">${label}</span>` :
-      L.event_count === 0 ? `<span class="st bad">no notes yet — use ↑ take or ↓ take to pull some in</span>` :
-      L.overflow.length ? `<span class="st bad">${L.overflow.length} syllable${L.overflow.length>1?"s":""} without a note: <span class="over">${L.overflow.join(" ")}</span></span>` :
-      d > 2 ? `<span class="st">${d} held notes (~)</span>` : d > 0 ? `<span class="st good">fits (${d} held)</span>` : `<span class="st good">fits</span>`;
-  const last = L.index >= 0 && L.index === sec.lines.length - 1, first = L.index === 0;
-  const reflowBtns = (L.index < 0 || L.uniform) ? "" : `<span style="border-left:1px solid var(--line); height:16px; margin:0 2px"></span>
-      <button class="small" data-reflow="-1" title="Take the last note of the line above into this line" ${first ? "disabled" : ""}>↑ take</button>
-      <button class="small" data-reflow="+1" title="Give this line's first note to the line above" ${first ? "disabled" : ""}>↑ give</button>
-      <button class="small" data-reflow="next-1" title="Give this line's last note to the line below" ${last ? "disabled" : ""}>↓ give</button>
-      <button class="small" data-reflow="next+1" title="Take the first note of the line below into this line" ${last ? "disabled" : ""}>↓ take</button>`;
-  const orig = L.original ? `<div class="muted" style="font-size:12px">${L.timed === false ? "≈ " : ""}${L.time ? L.time[0] + "–" + L.time[1] + " s · " : ""}${L.original}</div>` : "";
-  const numLabel = L.uniform ? `<b>${L.bars}</b>` : (L.index >= 0 ? "<b>"+(L.gindex !== undefined ? L.gindex + 1 : L.index + 1)+".</b>" : "");
-  head.innerHTML = `${orig}<div class="txt">${numLabel}${L.chips.length ? L.chips.join("·") : ""}</div>
+  const status = L.held ? `<span class="st">${L.note_count} notes after the last syllable (held)</span>` :
+      L.overflow.length ? `<span class="st bad">${L.overflow.length} without a note: <span class="over">${L.overflow.join(" ")}</span></span>` :
+      L.empty ? `<span class="st">empty line</span>` : `<span class="st good">fits</span>`;
+  const idx = L.held ? "" : `<b class="muted">${L.index+1}.</b> `;
+  const editor = L.held ? `<div class="muted">held notes — add a line above them, or more words to the line above</div>`
+      : `<div style="display:flex;gap:6px;align-items:center">${idx}<input value="${L.text.replace(/"/g,'&quot;')}" placeholder="(empty line: type words here)" title="Edit this line; Enter to apply"></div>`;
+  head.innerHTML = `${editor}
     <div class="row"><span class="st">${L.note_count} notes ↔ ${L.syllable_count} syl</span> ${status}</div>
     <div class="row"><button class="small" data-play="synth" title="Play just this line as a simple synth (space)">▶ line</button>
-      <button class="small" data-play="orig" title="Play the original recording for this line's bars" ${S.has_audio && S.bar_times.length ? "" : "disabled"}>▶ original</button>${reflowBtns}</div>`;
+      <button class="small" data-play="orig" title="Play the original recording for this line's bars" ${S.has_audio && S.bar_times.length ? "" : "disabled"}>▶ original</button>
+      ${L.held ? "" : `<button class="small" data-line="insert" title="Add an empty line after this one">+ line below</button>
+      <button class="small" data-line="delete" title="Delete this line (only when it is empty)" ${L.empty ? "" : "disabled"}>✕ delete</button>`}</div>`;
   head.querySelector('[data-play="synth"]').addEventListener("click", () => playSynth(L.notes, L.events));
-  head.querySelector('[data-play="orig"]').addEventListener("click", () => playOriginal(L.events || L.notes));
-  head.querySelectorAll("[data-reflow]").forEach(b => b.addEventListener("click", () => {
-    const v = b.dataset.reflow;
-    if (v === "-1") reflow(sec.index, L.index, -1);          // my start moves one note earlier
-    else if (v === "+1") reflow(sec.index, L.index, +1);     // my start moves one note later
-    else if (v === "next-1") reflow(sec.index, L.index + 1, -1);  // next line's start moves earlier: I give my last note
-    else reflow(sec.index, L.index + 1, +1);                 // next line's start moves later: I take its first note
-  }));
+  head.querySelector('[data-play="orig"]').addEventListener("click", () => playOriginal(L.events.length ? L.events : L.notes));
+  const inp = head.querySelector("input");
+  if (inp) {
+    const commit = () => { if (inp.value !== L.text) lineOp(sec.index, L.index, "set", inp.value); };
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); commit(); } });
+    inp.addEventListener("blur", commit);
+  }
+  head.querySelectorAll("[data-line]").forEach(b => b.addEventListener("click", () => lineOp(sec.index, L.index, b.dataset.line)));
   row.appendChild(head);
-  row.appendChild(roll(L.events || L.notes, pxu));
+  row.appendChild(roll(L.events.length ? L.events : L.notes, pxu));
   return row;
 }
 
 function roll(events, pxu){
   const wrap = document.createElement("div"); wrap.className = "roll";
   const notes = events.filter(e => e.kind !== "rest"), rests = events.filter(e => e.kind === "rest");
-  if (!events.length) { const d = document.createElement("div"); d.className = "st"; d.style.padding = "12px 0"; d.textContent = "(empty)"; wrap.appendChild(d); return wrap; }
-  if (!notes.length) { const d = document.createElement("div"); d.className = "st"; d.textContent = "only a pause in this line"; wrap.appendChild(d); }
+  if (!events.length) { const d = document.createElement("div"); d.className = "st"; d.style.padding = "12px 0"; d.textContent = "(no notes for this line yet)"; wrap.appendChild(d); return wrap; }
   const firstBar = Math.min(...events.map(n=>n.bar)), lastBar = Math.max(...events.map(n=>n.bar));
   const x0 = S.bars.slice(0, firstBar).reduce((a,b)=>a+b.units, 0);
   const bars = S.bars.slice(firstBar, lastBar+1);
@@ -182,12 +159,12 @@ function roll(events, pxu){
     const t = document.createElementNS(NS, "text"); t.setAttribute("x", x+3); t.setAttribute("y", 12); t.setAttribute("class", "bar"); t.textContent = `bar ${b.index+1}`; svg.appendChild(t);
     rests.filter(r => r.bar === b.index).forEach(r => {
       const rr = document.createElementNS(NS, "rect"); rr.setAttribute("x", 12 + (r.start - x0)*pxu); rr.setAttribute("y", 16); rr.setAttribute("width", Math.max(2, r.dur*pxu-1)); rr.setAttribute("height", H-70); rr.setAttribute("class", "rest");
-      rr.addEventListener("click", () => sing(r)); const tt = document.createElementNS(NS, "title"); tt.textContent = `pause of ${r.dur} units (${(r.dur*secondsPerUnit()).toFixed(2)} s): click to add a pickup note here`; rr.appendChild(tt); svg.appendChild(rr);
+      rr.addEventListener("click", () => sing(r)); const tt = document.createElementNS(NS, "title"); tt.textContent = `pause of ${(r.dur*secondsPerUnit()).toFixed(2)} s: click to add a pickup note here`; rr.appendChild(tt); svg.appendChild(rr);
       if (r.dur * pxu >= 22) { const pt = document.createElementNS(NS, "text"); pt.setAttribute("x", 12 + (r.start - x0)*pxu + 2); pt.setAttribute("y", H-8); pt.setAttribute("class", "bar"); pt.textContent = r.dur >= S.beat ? "pause" : "·"; svg.appendChild(pt); }
     });
     x += b.units*pxu;
   });
-  let labelEnd = [-1e9, -1e9];  // right edge of the last syllable label on each of two label rows
+  let labelEnd = [-1e9, -1e9];
   notes.forEach(n => {
     const rx = 12 + (n.start - x0)*pxu, w = Math.max(3, n.dur*pxu - 1);
     const r = document.createElementNS(NS, "rect"); r.setAttribute("x", rx); r.setAttribute("y", y(n.pitch)-8); r.setAttribute("width", w); r.setAttribute("height", 16); r.setAttribute("rx", 3);
@@ -195,21 +172,20 @@ function roll(events, pxu){
     r.addEventListener("click", () => select(n.id));
     const tt = document.createElementNS(NS, "title"); tt.textContent = `${n.name} · ${n.dur} units · bar ${n.bar+1}`; r.appendChild(tt); svg.appendChild(r);
     const label = n.syllable.text, lw = label.length * 8 + 6;
-    const rowIdx = rx >= labelEnd[0] ? 0 : (rx >= labelEnd[1] ? 1 : 0);   // stagger onto a second row when labels would overlap
+    const rowIdx = rx >= labelEnd[0] ? 0 : (rx >= labelEnd[1] ? 1 : 0);
     labelEnd[rowIdx] = rx + lw;
     const t = document.createElementNS(NS, "text"); t.setAttribute("x", rx + 1); t.setAttribute("y", rowIdx ? H-24 : H-8); t.setAttribute("class", "syl" + (n.syllable.line === null ? " mel" : "")); t.textContent = label; svg.appendChild(t);
-    const pn = document.createElementNS(NS, "text"); pn.setAttribute("x", rx + 1); pn.setAttribute("y", y(n.pitch) - 8); pn.setAttribute("class", "bar"); pn.textContent = n.name; svg.appendChild(pn);
+    const pn = document.createElementNS(NS, "text"); pn.setAttribute("x", rx + 1); pn.setAttribute("y", y(n.pitch) - 10); pn.setAttribute("class", "bar"); pn.textContent = n.name; svg.appendChild(pn);
   });
   return wrap;
 }
 
 function select(id){
   selected = id; const n = noteById(id); const where = lineOf(id);
-  $("selinfo").textContent = n ? `#${id} ${n.name}, ${n.dur} units, bar ${n.bar+1}${where ? `, line ${where.line.index+1}` : ""}, "${n.syllable.text}"` : "none";
+  $("selinfo").textContent = n ? `#${id} ${n.name}, ${n.dur} units, bar ${n.bar+1}${where && !where.line.held ? `, line ${where.line.index+1}` : ""}, "${n.syllable.text}"` : "none";
   document.querySelectorAll("rect.note").forEach(r => r.classList.toggle("sel", Number(r.dataset.id) === id));
-
 }
-function applyPayload(r, msg){ S = Object.assign(S, r); meta(); render(); if (selected !== null && noteById(selected)) select(selected); if (msg !== undefined) say(msg); }
+function applyPayload(r, msg){ S = Object.assign(S, r); $("lyrics").value = S.lyrics; meta(); render(); if (selected !== null && noteById(selected)) select(selected); if (msg !== undefined) say(msg); }
 
 async function doOp(op){
   if (selected === null) { say("select a note first", true); return; }
@@ -223,16 +199,16 @@ async function sing(r){
   catch(e){ history.pop(); say(e.message, true); }
 }
 async function setAbc(abc){ try { applyPayload(await api("/yue2sml/set", {name: NAME, abc}), abc === null ? "back to the transcription" : "undone"); } catch(e){ say(e.message, true); } }
-async function reflow(section, line, delta, reset){
-  try { const r = await api("/yue2sml/reflow", reset ? {name: NAME, section, reset: true} : {name: NAME, section, line, delta}); applyPayload(r, r.msg); }
+async function lineOp(section, line, action, text){
+  try { const r = await api("/yue2sml/lines", {name: NAME, section, line, action, text: text || ""}); applyPayload(r, r.msg); }
   catch(e){ say(e.message, true); }
 }
 
 // ---- playback
 function stopAll(){ if (audioEl) audioEl.pause(); synthTimers.forEach(clearTimeout); synthTimers = []; document.querySelectorAll("rect.play").forEach(r=>r.classList.remove("play")); }
-function playOriginal(notes){
-  stopAll(); if (!notes.length || !S.bar_times.length) { say("no original audio / bar timing for this session", true); return; }
-  const b0 = Math.min(...notes.map(n=>n.bar)), b1 = Math.max(...notes.map(n=>n.bar));
+function playOriginal(events){
+  stopAll(); if (!events.length || !S.bar_times.length) { say("no original audio / bar timing for this session", true); return; }
+  const b0 = Math.min(...events.map(n=>n.bar)), b1 = Math.max(...events.map(n=>n.bar));
   const t0 = S.bar_times[b0], t1 = S.bar_times[b1+1] || (t0 + 8);
   if (!audioEl) audioEl = new Audio(`/yue2sml/audio?name=${encodeURIComponent(NAME)}`);
   audioEl.currentTime = t0; audioEl.play(); say(`original: bars ${b0+1}–${b1+1} (${t0.toFixed(1)}–${t1.toFixed(1)} s)`);
@@ -242,7 +218,7 @@ function playOriginal(notes){
 function playSynth(notes, events){
   stopAll(); if (!notes.length) return;
   if (!synthCtx) synthCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const spu = secondsPerUnit(), t = synthCtx.currentTime + 0.05, start0 = (events && events.length ? events[0] : notes[0]).start;  // a leading pause is played as silence
+  const spu = secondsPerUnit(), t = synthCtx.currentTime + 0.05, start0 = (events && events.length ? events[0] : notes[0]).start;
   notes.forEach((n, i) => {
     const at = t + (n.start - start0)*spu, dur = n.dur*spu;
     if (i > 0) { const prev = notes[i-1], gap = n.start - (prev.start + prev.dur); if (gap >= S.beat / 2) synthTimers.push(setTimeout(() => say(`… pause ${(gap*spu).toFixed(2)} s …`), (t + (prev.start + prev.dur - start0)*spu - synthCtx.currentTime)*1000)); }
@@ -258,21 +234,13 @@ function playSynth(notes, events){
 
 document.querySelectorAll("#toolbar button[data-op]").forEach(b => b.addEventListener("click", () => doOp(b.dataset.op)));
 $("undo").addEventListener("click", () => { if (!history.length) { say("nothing to undo"); return; } setAbc(history.pop()); });
-$("reset").addEventListener("click", () => { if (confirm("Discard all note edits and go back to the transcription? (your line reflow is kept)")) { history = []; setAbc(null); } });
+$("reset").addEventListener("click", () => { if (confirm("Discard all note edits and go back to the transcription?")) { history = []; setAbc(null); } });
 $("editlyrics").addEventListener("click", () => { const b = $("lyricsbox"); b.style.display = b.style.display === "block" ? "none" : "block"; });
-$("applylyrics").addEventListener("click", async () => { try { applyPayload(await api("/yue2sml/lyrics", {name: NAME, lyrics: $("lyrics").value, language: $("language").value, original_lyrics: $("origlyrics").value}), "lyrics updated for the alignment view"); } catch(e){ say(e.message, true); } });
-$("mode").addEventListener("change", async () => { try { applyPayload(await api("/yue2sml/mode", {name: NAME, mode: $("mode").value})); } catch(e){ say(e.message, true); $("mode").value = S.mode || "auto"; } });
-$("timebtn").addEventListener("click", async () => {
-  const orig = $("origlyrics").value.trim();
-  if (!orig && !confirm("No original lyrics pasted (Lyrics… box). Time the NEW lyrics against the recording instead?")) return;
-  say("⏱ listening to the recording… (about a minute)"); $("timebtn").disabled = true;
-  try { const r = await api("/yue2sml/time_lyrics", {name: NAME, original_lyrics: orig || null, language: $("origlang").value}); S = Object.assign(S, r); $("mode").querySelector('[value="recording"]').disabled = false; $("mode").value = "recording"; meta(); render(); say(r.msg); }
-  catch(e){ say(e.message, true); } finally { $("timebtn").disabled = false; }
-});
+$("applylyrics").addEventListener("click", async () => { try { applyPayload(await api("/yue2sml/lyrics", {name: NAME, lyrics: $("lyrics").value, language: $("language").value}), "lyrics updated"); } catch(e){ say(e.message, true); } });
 $("stop").addEventListener("click", stopAll);
 $("zoom").addEventListener("input", () => { try { localStorage.setItem("yue2sml.zoom", $("zoom").value); } catch(e){} render(); if (selected !== null) select(selected); });
 window.addEventListener("keydown", e => {
-  if (e.target.tagName === "TEXTAREA") return;
+  if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
   const map = {"s":"split","m":"merge","+":"longer","=":"longer","-":"shorter","ArrowUp":"up","ArrowDown":"down","x":"silence"};
   if (map[e.key]) { e.preventDefault(); doOp(map[e.key]); }
   if (e.key === "ArrowRight" && selected !== null) { e.preventDefault(); const ids = allNotes().map(n=>n.id); select(Math.min(selected+1, Math.max(...ids))); }

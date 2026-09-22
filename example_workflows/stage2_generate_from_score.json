@@ -172,8 +172,6 @@
      "name": "STRING",
      "type": "STRING",
      "links": [
-      3,
-      9,
       21
      ]
     }
@@ -962,14 +960,6 @@
       "name": "transcription_folder"
      },
      "link": null
-    },
-    {
-     "name": "original_lyrics",
-     "type": "STRING",
-     "widget": {
-      "name": "original_lyrics"
-     },
-     "link": null
     }
    ],
    "outputs": [
@@ -984,7 +974,10 @@
     {
      "name": "lyrics",
      "type": "STRING",
-     "links": []
+     "links": [
+      3,
+      9
+     ]
     },
     {
      "name": "report",
@@ -998,7 +991,6 @@
    "widgets_values": [
     "English",
     "my_song",
-    "",
     ""
    ],
    "title": "LYRIC ALIGNER — open it, edit, close, queue again"
@@ -1023,8 +1015,8 @@
   ],
   [
    3,
-   4,
-   0,
+   17,
+   1,
    5,
    1,
    "STRING"
@@ -1071,8 +1063,8 @@
   ],
   [
    9,
-   4,
-   0,
+   17,
+   1,
    11,
    2,
    "STRING"

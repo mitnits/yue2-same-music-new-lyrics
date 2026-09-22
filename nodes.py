@@ -347,11 +347,11 @@ class Yue2SmlLyricAligner(io.ComfyNode):
             node_id="Yue2SmlLyricAligner",
             display_name="Lyric Aligner (edit notes without notation)",
             category=CATEGORY,
-            description=("Visual editor for non-musicians: the sung notes of each section drawn as blocks with your "
-                         "syllables under them. Split a note to make room for an extra syllable, merge two notes when "
-                         "you have one fewer, make a note longer/shorter, nudge its pitch up/down within the key, turn "
-                         "a rest into a pickup note, and play each phrase (synth or the original recording). Edits are "
-                         "saved per 'name' and flow out of the abc output; upstream transcription is cached."),
+            description=("Note tweaker for non-musicians: your syllables are poured over each section's sung notes in "
+                         "order, drawn one row per lyric line. Click a note and Split / Merge / Longer / Shorter / Up / "
+                         "Down / Silence; click a pause to add a pickup note; play a line (synth or the original "
+                         "recording). Lines can be edited, inserted or deleted right there. Edits are saved per 'name' "
+                         "and flow out of the abc and lyrics outputs. Connect the lyrics output to YuE2 Generate Music."),
             inputs=[
                 io.String.Input("abc", multiline=True, force_input=True),
                 io.String.Input("lyrics", multiline=True, force_input=True),
@@ -359,9 +359,6 @@ class Yue2SmlLyricAligner(io.ComfyNode):
                 io.String.Input("name", default="my_song"),
                 io.String.Input("transcription_folder", default="", optional=True,
                                 tooltip="Connect Transcribe's 'folder' output to enable playback of the original recording per phrase."),
-                io.String.Input("original_lyrics", default="", multiline=True, optional=True,
-                                tooltip="The recording's own lyrics. With them the aligner can time each line against the "
-                                        "recording (Whisper) and map your new lines onto the real melody lines."),
             ],
             outputs=[io.String.Output(display_name="abc"), io.String.Output(display_name="lyrics"),
                      io.String.Output(display_name="report")],
@@ -369,13 +366,16 @@ class Yue2SmlLyricAligner(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, abc, lyrics, language, name, transcription_folder="", original_lyrics=""):
-        state = aligner_server.prepare_session(name, abc, lyrics, language, transcription_folder, original_lyrics)
+    def execute(cls, abc, lyrics, language, name, transcription_folder=""):
+        state = aligner_server.prepare_session(name, abc, lyrics, language, transcription_folder)
         out_abc = state.get("edited_abc") or abc
+        out_lyrics = state.get("lyrics") if state.get("lyrics_edited") else lyrics
         edited = bool(state.get("edited_abc"))
-        report = aligner_server.summary(out_abc, lyrics, language, edited)
+        report = aligner_server.summary(out_abc, out_lyrics, language, edited)
+        if state.get("lyrics_edited"):
+            report = "lyrics edited in the aligner · " + report
         logging.info(f"[yue2-sml] Lyric Aligner '{name}': {'edited score' if edited else 'transcription'} passed downstream")
-        return io.NodeOutput(out_abc, lyrics, report, ui={"aligner": (name,), "text": (report,)})
+        return io.NodeOutput(out_abc, out_lyrics, report, ui={"aligner": (name,), "text": (report,)})
 
 
 class Yue2SmlScoreFacts(io.ComfyNode):
