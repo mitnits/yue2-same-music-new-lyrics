@@ -98,11 +98,11 @@ function render(){
     const el = document.createElement("section"); el.className = "sec";
     const over = sec.lines.reduce((a,L)=>a+L.overflow.length, 0);
     const held = sec.lines.filter(L=>L.held).reduce((a,L)=>a+L.note_count, 0);
-    const st = !sec.tag ? '<span class="st bad">no lyrics for this part of the score</span>'
+    const st = !sec.tag ? (S.global_pour ? '<span class="st bad">the lyrics ran out before this part of the score</span>' : '<span class="st bad">no lyrics section for this part of the score (add a [tag] block, or remove all tags to pour straight through)</span>')
              : over ? `<span class="st bad">${over} syllable${over>1?"s":""} without a note</span>` : (held ? `<span class="st">${held} notes left over (held)</span>` : '<span class="st good">fits</span>');
-    el.innerHTML = `<h3>${sec.name} <span class="st">${sec.note_count} notes</span> ↔ ${sec.tag ? "["+sec.tag+"]" : ""} <span class="st">${sec.syllable_count} syllables</span> ${st}
+    el.innerHTML = `<h3>${sec.name} <span class="st">${sec.note_count} notes</span> ↔ ${sec.tag && !S.global_pour ? "["+sec.tag+"]" : ""} <span class="st">${sec.syllable_count} syllables</span> ${st}
       <button class="small" data-addfirst="1" title="Add an empty line at the top of this section">+ line at top</button></h3>`;
-    el.querySelector("[data-addfirst]").addEventListener("click", () => lineOp(sec.index, -1, "insert"));
+    el.querySelector("[data-addfirst]").addEventListener("click", () => lineOp(sec.block, (sec.first_line_index ?? 0) - 1, "insert"));
     sec.lines.forEach(L => el.appendChild(lineRow(sec, L, pxu)));
     root.appendChild(el);
   });
@@ -138,15 +138,15 @@ function lineRow(sec, L, pxu){
   head.querySelector('[data-play="orig"]').addEventListener("click", () => playOriginal(L.events.length ? L.events : L.notes));
   const inp = head.querySelector("input");
   if (inp) {
-    const commit = () => { if (inp.value !== L.text) lineOp(sec.index, L.index, "set", inp.value); };
+    const commit = () => { if (inp.value !== L.text) lineOp(L.block, L.index, "set", inp.value); };
     inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); commit(); } });
     inp.addEventListener("blur", commit);
   }
-  head.querySelectorAll("[data-line]").forEach(b => b.addEventListener("click", () => lineOp(sec.index, L.index, b.dataset.line)));
+  head.querySelectorAll("[data-line]").forEach(b => b.addEventListener("click", () => lineOp(L.block, L.index, b.dataset.line)));
   head.querySelectorAll("[data-x]").forEach(b => b.addEventListener("click", () => {
     const v = b.dataset.x;  // prev-: line above gives (its extra -1); prev+: line above takes (+1); this±: this line's extra
-    if (v === "prev-") extraOp(sec.index, L.index - 1, -1); else if (v === "prev+") extraOp(sec.index, L.index - 1, +1);
-    else if (v === "this-") extraOp(sec.index, L.index, -1); else extraOp(sec.index, L.index, +1);
+    if (v === "prev-") extraOp(L.block, L.index - 1, -1); else if (v === "prev+") extraOp(L.block, L.index - 1, +1);
+    else if (v === "this-") extraOp(L.block, L.index, -1); else extraOp(L.block, L.index, +1);
   }));
   row.appendChild(head);
   row.appendChild(roll(L.events.length ? L.events : L.notes, pxu));

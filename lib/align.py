@@ -416,49 +416,77 @@ def align(model: Model, lyrics: str, language: str, line_extra: dict | None = No
     rests = rests_view(model)
     beat = max(1, model.unit_den // 4)
     blocks = lyric_blocks(lyrics)
-    if len(blocks) == 1 and blocks[0]["tag"] == "untagged" and len(secs) > 1:
-        # untagged lyrics: keep it simple, everything pours from the first sung section onward
-        pass
-    view_sections = []
-    for si, sec in enumerate(secs):
-        sec_notes = [notes[i] for i in sec["notes"]]
-        events = section_events(model, sec_notes, rests)
-        block = blocks[si] if si < len(blocks) else None
-        lines = block["lines"] if block else []
-        # pour
-        k = 0
-        rows = []
-        extras = line_extra.get(str(si), {})
+    global_pour = len(blocks) == 1 and blocks[0]["tag"] == "untagged"
+    if not global_pour:
+        blocks = [b for b in blocks if any(_chips_for_line(t, language) for t in b["lines"])]  # skip [Guitar Solo] etc.
+    # note streams: one per section (tagged lyrics) or one for the whole song (untagged lyrics)
+    sec_notes_all = [[notes[i] for i in sec["notes"]] for sec in secs]
+    sec_of_note = {n["id"]: si for si, sn in enumerate(sec_notes_all) for n in sn}
+    streams = [(0, [n for sn in sec_notes_all for n in sn])] if global_pour else list(enumerate(sec_notes_all))
+
+    def pour(block_index, stream, lines):
+        k, rows = 0, []
+        extras = line_extra.get(str(block_index), {})
         for li, text in enumerate(lines):
             chips = _chips_for_line(text, language)
             extra = int(extras.get(str(li), 0))
             want = max(0, len(chips) + extra)
-            run = sec_notes[k:k + want]
+            run = stream[k:k + want]
             assigned = [dict(nn, syllable={"line": li, "text": chips[j]} if j < len(chips) else {"line": None, "text": "~"})
                         for j, nn in enumerate(run)]
             k += len(run)
-            rows.append({"index": li, "text": text, "chips": chips, "notes": assigned, "note_count": len(run),
-                         "syllable_count": len(chips), "overflow": chips[len(run):], "empty": not text.strip(),
-                         "extra": extra})
-        rest_notes = [dict(nn, syllable={"line": None, "text": "~"}) for nn in sec_notes[k:]]
-        if rest_notes:
-            rows.append({"index": -1, "text": "", "chips": [], "notes": rest_notes, "note_count": len(rest_notes),
-                         "syllable_count": 0, "overflow": [], "empty": False, "held": True})
-        # events (pauses) per row: pauses between the row's first and last note
+            rows.append({"index": li, "block": block_index, "text": text, "chips": chips, "notes": assigned,
+                         "note_count": len(run), "syllable_count": len(chips), "overflow": chips[len(run):],
+                         "empty": not text.strip(), "extra": extra})
+        return rows, stream[k:]
+
+    rows_by_sec = {si: [] for si in range(len(secs))}
+    held_by_sec = {si: [] for si in range(len(secs))}
+    for bi, stream in streams:
+        lines = blocks[bi]["lines"] if bi < len(blocks) else []
+        rows, leftover = pour(bi, stream, lines)
+        # a row is shown under the section where its first note lives; a row without notes goes with the NEXT row
+        # that has notes (so a line added "at the top" of a section appears there), else with the previous one
+        sis = [sec_of_note[r["notes"][0]["id"]] if r["notes"] else None for r in rows]
+        last_si = bi if not global_pour else 0
+        for i in range(len(rows) - 1, -1, -1):
+            if sis[i] is None:
+                sis[i] = next((sis[j] for j in range(i + 1, len(rows)) if sis[j] is not None), None)
+        for i, r in enumerate(rows):
+            si = sis[i] if sis[i] is not None else last_si
+            si = min(si, len(secs) - 1)
+            rows_by_sec[si].append(r)
+            last_si = si
+        for nn in leftover:
+            held_by_sec[sec_of_note[nn["id"]]].append(dict(nn, syllable={"line": None, "text": "~"}))
+    view_sections = []
+    for si, sec in enumerate(secs):
+        sec_notes = sec_notes_all[si]
+        events = section_events(model, sec_notes, rests)
+        rows = rows_by_sec[si]
+        if held_by_sec[si]:
+            hn = held_by_sec[si]
+            rows.append({"index": -1, "block": 0 if global_pour else si, "text": "", "chips": [], "notes": hn,
+                         "note_count": len(hn), "syllable_count": 0, "overflow": [], "empty": False, "held": True})
+        all_events = events if not global_pour else None
         for r in rows:
             if r["notes"]:
                 a, b = r["notes"][0]["start"], r["notes"][-1]["start"] + r["notes"][-1]["dur"]
                 syl = {n["id"]: n["syllable"] for n in r["notes"]}
+                src = all_events if all_events is not None else section_events(model, [n for n in notes if a <= n["start"] < b], rests)
                 r["events"] = [dict(e, syllable=syl[e["id"]]) if e["kind"] == "note" else e
-                               for e in events if a <= e["start"] < b]
+                               for e in src if a <= e["start"] < b]
             else:
                 r["events"] = []
-        view_sections.append({"index": si, "name": sec["name"], "tag": block["tag"] if block else None,
+        tag = (blocks[si]["tag"] if si < len(blocks) else None) if not global_pour else ("lyrics" if rows else None)
+        view_sections.append({"index": si, "block": 0 if global_pour else si, "name": sec["name"], "tag": tag,
                               "lines": rows, "note_count": len(sec_notes),
                               "syllable_count": sum(r["syllable_count"] for r in rows),
-                              "line_count": len(lines)})
+                              "first_line_index": next((r["index"] for r in rows if r["index"] >= 0), None),
+                              "line_count": sum(1 for r in rows if r["index"] >= 0)})
     return {"unit_den": model.unit_den, "beat": beat, "key": model.header_key, "sections": view_sections,
-            "extra_lyric_sections": [b["tag"] for b in blocks[len(secs):]],
+            "global_pour": global_pour,
+            "extra_lyric_sections": [] if global_pour else [b["tag"] for b in blocks[len(secs):]],
             "bars": [{"index": b.index, "units": b.units, "section": b.section} for b in model.bars]}
 
 
