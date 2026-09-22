@@ -922,8 +922,8 @@
     -580
    ],
    "size": [
-    820,
-    620
+    460,
+    300
    ],
    "flags": {},
    "order": 17,
@@ -1001,7 +1001,7 @@
     "",
     ""
    ],
-   "title": "LYRIC ALIGNER — notes ↔ syllables, edit by clicking"
+   "title": "LYRIC ALIGNER — open it, edit, close, queue again"
   }
  ],
  "links": [

@@ -17,11 +17,11 @@
   section.sec { background:var(--panel); border:1px solid var(--line); border-radius:8px; margin:10px 0; padding:8px 10px }
   section.sec h3 { margin:0 0 4px; font-size:14px; display:flex; gap:10px; align-items:baseline; flex-wrap:wrap }
   .st { font-weight:400; color:var(--muted) } .st.bad { color:var(--over) } .st.good { color:var(--ok) } .st.pin { color:var(--pin) }
-  .line { display:grid; grid-template-columns: 300px 1fr; gap:8px; align-items:center; border-top:1px solid var(--line); padding:6px 0 }
+  .line { display:grid; grid-template-columns: 360px 1fr; gap:10px; align-items:center; border-top:1px solid var(--line); padding:8px 0 }
   .line .head { display:flex; flex-direction:column; gap:4px } .line .head .txt { font-size:13px } .line .head .txt b { color:var(--muted); font-weight:500; margin-right:4px }
   .line .head .row { display:flex; gap:4px; flex-wrap:wrap; align-items:center }
   .roll { overflow-x:auto; padding-bottom:2px }
-  svg { display:block } text { font:11px system-ui, sans-serif; fill:var(--text) } text.syl { font-size:12px } text.mel { fill:var(--muted) } text.bar { fill:var(--muted); font-size:10px }
+  svg { display:block } text { font:12px system-ui, sans-serif; fill:var(--text) } text.syl { font-size:14px } text.mel { fill:var(--muted) } text.bar { fill:var(--muted); font-size:10px }
   rect.note { fill:var(--note); stroke:#1b3a80; cursor:pointer } rect.note.mel { fill:var(--mel); stroke:#444 } rect.note.sel { fill:var(--sel); stroke:#8a5a00 } rect.note.play { fill:#9be0ff }
   rect.rest { fill:var(--rest); stroke:none; cursor:pointer } rect.rest:hover { fill:#3d3d47 }
   .legend { color:var(--muted); font-size:12px; margin:8px 0 0 }
@@ -43,6 +43,7 @@
     <option value="off">off — show notes uniformly</option></select></label>
   <button id="timebtn" title="Whisper listens to the recording and times each ORIGINAL lyric line; new lyrics then map onto those lines">⏱ Time lyrics from recording</button>
   <button id="stop" title="Stop playback">■ Stop</button>
+  <label class="muted" title="Width of the note blocks">zoom <input id="zoom" type="range" min="4" max="28" step="1" style="vertical-align:middle;width:90px"></label>
   <span id="msg"></span>
 </header>
 <div id="toolbar">
@@ -91,6 +92,7 @@ async function load(){
   sel.value = S.language; $("lyrics").value = S.lyrics;
   const ol = $("origlang"); if (ol.options.length === 1) LANGS.forEach(l => { const o=document.createElement("option"); o.value=o.textContent=l; ol.appendChild(o); });
   if (S.original_lyrics !== undefined) $("origlyrics").value = S.original_lyrics;
+  if (!$("zoom").dataset.init) { $("zoom").value = Math.max(6, Math.min(24, Math.round(10 * 32 / S.unit_den))); $("zoom").dataset.init = "1"; try { const z = localStorage.getItem("yue2sml.zoom"); if (z) $("zoom").value = z; } catch(e){} }
   $("mode").value = S.mode || "auto";
   $("mode").querySelector('[value="recording"]').disabled = !S.has_timing;
   $("timebtn").disabled = !S.timing_available;
@@ -105,7 +107,7 @@ function lineOf(id){ for (const s of S.sections) for (const L of s.lines) if (L.
 
 function render(){
   const root = $("sections"); root.innerHTML = "";
-  const pxu = Math.max(4, Math.min(12, Math.round(7 * 32 / S.unit_den)));
+  const pxu = Number($("zoom").value) || 12;
   S.sections.forEach(sec => {
     const el = document.createElement("section"); el.className = "sec";
     const diff = sec.syllable_count - sec.note_count;
@@ -170,16 +172,16 @@ function roll(events, pxu){
   const x0 = S.bars.slice(0, firstBar).reduce((a,b)=>a+b.units, 0);
   const bars = S.bars.slice(firstBar, lastBar+1);
   const totalUnits = bars.reduce((a,b)=>a+b.units,0);
-  const W = totalUnits*pxu + 30, H = 130;
+  const W = totalUnits*pxu + 30, H = 150;
   const lo = notes.length ? Math.min(...notes.map(n=>n.pitch)) : 60, hi = notes.length ? Math.max(...notes.map(n=>n.pitch)) : 60;
-  const y = p => 22 + (hi - p) * Math.min(8, 60/Math.max(1, hi-lo));
+  const y = p => 26 + (hi - p) * Math.min(9, 72/Math.max(1, hi-lo));
   const svg = document.createElementNS(NS, "svg"); svg.setAttribute("width", W); svg.setAttribute("height", H); wrap.appendChild(svg);
   let x = 12;
   bars.forEach(b => {
-    const l = document.createElementNS(NS, "line"); l.setAttribute("x1", x); l.setAttribute("x2", x); l.setAttribute("y1", 4); l.setAttribute("y2", H-38); l.setAttribute("stroke", "#3a3a42"); svg.appendChild(l);
+    const l = document.createElementNS(NS, "line"); l.setAttribute("x1", x); l.setAttribute("x2", x); l.setAttribute("y1", 4); l.setAttribute("y2", H-42); l.setAttribute("stroke", "#3a3a42"); svg.appendChild(l);
     const t = document.createElementNS(NS, "text"); t.setAttribute("x", x+3); t.setAttribute("y", 12); t.setAttribute("class", "bar"); t.textContent = `bar ${b.index+1}`; svg.appendChild(t);
     rests.filter(r => r.bar === b.index).forEach(r => {
-      const rr = document.createElementNS(NS, "rect"); rr.setAttribute("x", 12 + (r.start - x0)*pxu); rr.setAttribute("y", 16); rr.setAttribute("width", Math.max(2, r.dur*pxu-1)); rr.setAttribute("height", H-64); rr.setAttribute("class", "rest");
+      const rr = document.createElementNS(NS, "rect"); rr.setAttribute("x", 12 + (r.start - x0)*pxu); rr.setAttribute("y", 16); rr.setAttribute("width", Math.max(2, r.dur*pxu-1)); rr.setAttribute("height", H-70); rr.setAttribute("class", "rest");
       rr.addEventListener("click", () => sing(r)); const tt = document.createElementNS(NS, "title"); tt.textContent = `pause of ${r.dur} units (${(r.dur*secondsPerUnit()).toFixed(2)} s): click to add a pickup note here`; rr.appendChild(tt); svg.appendChild(rr);
       if (r.dur * pxu >= 22) { const pt = document.createElementNS(NS, "text"); pt.setAttribute("x", 12 + (r.start - x0)*pxu + 2); pt.setAttribute("y", H-8); pt.setAttribute("class", "bar"); pt.textContent = r.dur >= S.beat ? "pause" : "·"; svg.appendChild(pt); }
     });
@@ -188,14 +190,14 @@ function roll(events, pxu){
   let labelEnd = [-1e9, -1e9];  // right edge of the last syllable label on each of two label rows
   notes.forEach(n => {
     const rx = 12 + (n.start - x0)*pxu, w = Math.max(3, n.dur*pxu - 1);
-    const r = document.createElementNS(NS, "rect"); r.setAttribute("x", rx); r.setAttribute("y", y(n.pitch)-6); r.setAttribute("width", w); r.setAttribute("height", 12); r.setAttribute("rx", 2);
+    const r = document.createElementNS(NS, "rect"); r.setAttribute("x", rx); r.setAttribute("y", y(n.pitch)-8); r.setAttribute("width", w); r.setAttribute("height", 16); r.setAttribute("rx", 3);
     r.setAttribute("class", "note" + (n.syllable.line === null ? " mel" : "") + (selected === n.id ? " sel" : "")); r.dataset.id = n.id;
     r.addEventListener("click", () => select(n.id));
     const tt = document.createElementNS(NS, "title"); tt.textContent = `${n.name} · ${n.dur} units · bar ${n.bar+1}`; r.appendChild(tt); svg.appendChild(r);
-    const label = n.syllable.text, lw = label.length * 7 + 4;
+    const label = n.syllable.text, lw = label.length * 8 + 6;
     const rowIdx = rx >= labelEnd[0] ? 0 : (rx >= labelEnd[1] ? 1 : 0);   // stagger onto a second row when labels would overlap
     labelEnd[rowIdx] = rx + lw;
-    const t = document.createElementNS(NS, "text"); t.setAttribute("x", rx + 1); t.setAttribute("y", rowIdx ? H-20 : H-8); t.setAttribute("class", "syl" + (n.syllable.line === null ? " mel" : "")); t.textContent = label; svg.appendChild(t);
+    const t = document.createElementNS(NS, "text"); t.setAttribute("x", rx + 1); t.setAttribute("y", rowIdx ? H-24 : H-8); t.setAttribute("class", "syl" + (n.syllable.line === null ? " mel" : "")); t.textContent = label; svg.appendChild(t);
     const pn = document.createElementNS(NS, "text"); pn.setAttribute("x", rx + 1); pn.setAttribute("y", y(n.pitch) - 8); pn.setAttribute("class", "bar"); pn.textContent = n.name; svg.appendChild(pn);
   });
   return wrap;
@@ -268,6 +270,7 @@ $("timebtn").addEventListener("click", async () => {
   catch(e){ say(e.message, true); } finally { $("timebtn").disabled = false; }
 });
 $("stop").addEventListener("click", stopAll);
+$("zoom").addEventListener("input", () => { try { localStorage.setItem("yue2sml.zoom", $("zoom").value); } catch(e){} render(); if (selected !== null) select(selected); });
 window.addEventListener("keydown", e => {
   if (e.target.tagName === "TEXTAREA") return;
   const map = {"s":"split","m":"merge","+":"longer","=":"longer","-":"shorter","ArrowUp":"up","ArrowDown":"down","x":"silence"};
