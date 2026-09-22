@@ -545,82 +545,107 @@ def _step_pitch(pitch: int, key: str, direction: int) -> int:
     return p
 
 
+def chain_of(model: Model, n: dict) -> list:
+    """(bar_index, event_index) of every tied piece of sung note n, in order (may cross bar lines)."""
+    out = [(n["bar"], n["ev"])]
+    bi, ei = n["bar"], n["ev"]
+    while True:
+        bar = model.bars[bi]
+        if ei + 1 < len(bar.events):
+            nxt = bar.events[ei + 1]
+            if nxt.kind == "note" and nxt.tie:
+                ei += 1; out.append((bi, ei)); continue
+            break
+        if bi + 1 < len(model.bars):
+            nb = model.bars[bi + 1]
+            if nb.events and nb.events[0].kind == "note" and nb.events[0].tie:
+                bi, ei = bi + 1, 0; out.append((bi, ei)); continue
+        break
+    return out
+
+
 def apply(abc: str, op: str, note_id: int, step: int | None = None) -> tuple[str, str]:
-    """Apply one operation to sung note `note_id`. Returns (new_abc, message)."""
+    """Apply one operation to sung note `note_id` (a tie chain is treated as one note). Returns (new_abc, message)."""
     model = parse(abc)
     notes = sung_notes(model)
     if not 0 <= note_id < len(notes):
         raise ValueError(f"no sung note {note_id}")
     n = notes[note_id]
-    bar = model.bars[n["bar"]]
-    ev = bar.events[n["ev"]]
+    chain = chain_of(model, n)
+    first = model.bars[chain[0][0]].events[chain[0][1]]
+    lbar_i, lev_i = chain[-1]
+    lbar, last = model.bars[lbar_i], model.bars[lbar_i].events[lev_i]
+    total = sum(model.bars[b].events[e].dur for b, e in chain)
     grid = step or min([e.dur for b in model.bars for e in b.events if not e.compressed] or [2])
     if op == "split":
-        if ev.dur < 2:
+        if total < 2:
             raise ValueError("this note is already the shortest possible")
-        first = max([a for a in ALLOWED if a <= ev.dur // 2] or [1])
-        second = ev.dur - first
-        bar.events.insert(n["ev"] + 1, Event("note", second, ev.pitch, tie=False, chords=[]))
-        ev.dur = first
-        msg = f"split note {note_id} ({n['name']}) into two: {first} + {second} units"
+        half = max([a for a in ALLOWED if a <= total // 2] or [1])
+        acc = 0
+        for b, e in chain:
+            ev = model.bars[b].events[e]
+            if acc + ev.dur > half:
+                cut = half - acc
+                if cut == 0:
+                    ev.tie = False                      # the new note starts exactly at this piece
+                else:
+                    model.bars[b].events.insert(e + 1, Event("note", ev.dur - cut, ev.pitch, tie=False))
+                    ev.dur = cut
+                break
+            acc += ev.dur
+        msg = f"split note {note_id} ({n['name']}, {total} units) into {half} + {total - half} units"
     elif op == "merge":
         if note_id + 1 >= len(notes):
             raise ValueError("no following note to merge with")
         m = notes[note_id + 1]
-        mbar, mev = model.bars[m["bar"]], model.bars[m["bar"]].events[m["ev"]]
-        # anything (rests) between them stays; the next note simply becomes a tied continuation at this pitch
-        mev.pitch = ev.pitch; mev.tie = True
-        # propagate the pitch through the rest of that note's tie chain
-        k = m["ev"] + 1
-        while k < len(mbar.events) and mbar.events[k].kind == "note" and mbar.events[k].tie:
-            mbar.events[k].pitch = ev.pitch; k += 1
-        touching = (m["bar"] == n["bar"] and not _has_rest_between(bar, n["ev"], m["ev"])) or \
-                   (m["bar"] == n["bar"] + 1 and n["ev"] == len(bar.events) - 1 and m["ev"] == 0)
+        touching = (m["bar"] == lbar_i and m["ev"] == lev_i + 1) or \
+                   (m["bar"] == lbar_i + 1 and lev_i == len(lbar.events) - 1 and m["ev"] == 0)
         if not touching:
-            raise ValueError("can only merge two notes that touch each other (no rest between them)")
-        msg = f"merged notes {note_id} and {note_id + 1} into one {n['name']} of {n['dur'] + m['dur']} units"
+            raise ValueError("can only merge two notes that touch each other (no pause between them)")
+        mev = model.bars[m["bar"]].events[m["ev"]]
+        mev.tie = True
+        for b, e in chain_of(model, m):
+            model.bars[b].events[e].pitch = first.pitch
+        msg = f"merged notes {note_id} and {note_id + 1} into one {n['name']} of {total + m['dur']} units"
     elif op == "longer":
-        nxt = bar.events[n["ev"] + 1] if n["ev"] + 1 < len(bar.events) else None
+        nxt = lbar.events[lev_i + 1] if lev_i + 1 < len(lbar.events) else None
         if nxt is None:
             raise ValueError("nothing after this note in its bar to take time from (bar lengths are fixed)")
-        if nxt.dur <= grid and nxt.kind == "note":
+        if nxt.kind == "note" and nxt.dur <= grid:
             raise ValueError("the next note is already as short as it can be")
         take = min(grid, nxt.dur)
-        ev.dur += take; nxt.dur -= take
+        last.dur += take; nxt.dur -= take
         if nxt.dur == 0:
-            bar.events.pop(n["ev"] + 1)
+            lbar.events.pop(lev_i + 1)
         msg = f"note {note_id} is {take} units longer"
     elif op == "shorter":
-        if ev.dur <= grid:
+        if total <= grid:
             raise ValueError("this note is already the shortest possible")
-        ev.dur -= grid
-        nxt = bar.events[n["ev"] + 1] if n["ev"] + 1 < len(bar.events) else None
-        if nxt is not None and nxt.kind == "rest":
-            nxt.dur += grid
+        give = min(grid, last.dur) if last.dur > grid or len(chain) == 1 else last.dur
+        if last.dur - give <= 0 and len(chain) > 1:
+            # drop the last piece entirely and turn it into a pause
+            last.kind = "rest"; last.pitch = None; last.tie = False; give = last.dur
+            after = lbar.events[lev_i + 1] if lev_i + 1 < len(lbar.events) else None
+            if after is not None and after.kind == "rest":
+                after.dur += last.dur; lbar.events.pop(lev_i)
         else:
-            bar.events.insert(n["ev"] + 1, Event("rest", grid))
-        msg = f"note {note_id} is {grid} units shorter (a short breath follows it)"
+            last.dur -= give
+            nxt = lbar.events[lev_i + 1] if lev_i + 1 < len(lbar.events) else None
+            if nxt is not None and nxt.kind == "rest":
+                nxt.dur += give
+            else:
+                lbar.events.insert(lev_i + 1, Event("rest", give))
+        msg = f"note {note_id} is {give} units shorter (a short breath follows it)"
     elif op in ("up", "down"):
-        newp = _step_pitch(ev.pitch, bar.key, 1 if op == "up" else -1)
-        # move the whole tie chain
-        for b in model.bars[n["bar"]:]:
-            done = False
-            for k, e in enumerate(b.events):
-                if b is bar and k < n["ev"]:
-                    continue
-                if e.kind == "note" and (k == n["ev"] and b is bar or e.tie):
-                    e.pitch = newp
-                else:
-                    done = True; break
-            if done:
-                break
+        newp = _step_pitch(first.pitch, model.bars[chain[0][0]].key, 1 if op == "up" else -1)
+        for b, e in chain:
+            model.bars[b].events[e].pitch = newp
         msg = f"note {note_id}: {n['name']} → {midi_name(newp)}"
     elif op == "silence":
-        ev.kind = "rest"; ev.pitch = None; ev.tie = False
-        k = n["ev"] + 1
-        while k < len(bar.events) and bar.events[k].kind == "note" and bar.events[k].tie:
-            bar.events[k].kind = "rest"; bar.events[k].pitch = None; bar.events[k].tie = False; k += 1
-        msg = f"note {note_id} is now a rest"
+        for b, e in chain:
+            ev = model.bars[b].events[e]
+            ev.kind = "rest"; ev.pitch = None; ev.tie = False
+        msg = f"note {note_id} is now a pause"
     else:
         raise ValueError(f"unknown operation {op}")
     return to_abc(model), msg
