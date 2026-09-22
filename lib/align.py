@@ -545,6 +545,66 @@ def _step_pitch(pitch: int, key: str, direction: int) -> int:
     return p
 
 
+def flatten(model: Model) -> tuple:
+    """The Vocal voice as a flat timeline: items [{kind, dur, pitch}] with tie chains and adjacent rests merged, plus
+    chords [(absolute_units, symbol)] kept at their absolute time (they must not move when notes move)."""
+    items, chords, pos = [], [], 0
+    for bar in model.bars:
+        for ev in bar.events:
+            for c in ev.chords:
+                chords.append((pos, c))
+            if ev.kind == "note" and ev.tie and items and items[-1]["kind"] == "note" and items[-1]["pitch"] == ev.pitch:
+                items[-1]["dur"] += ev.dur
+            elif ev.kind == "rest" and items and items[-1]["kind"] == "rest":
+                items[-1]["dur"] += ev.dur
+            else:
+                items.append({"kind": ev.kind, "dur": ev.dur, "pitch": ev.pitch})
+            pos += ev.dur
+    return items, chords
+
+
+def rebar(model: Model, items: list, chords: list) -> None:
+    """Cut a flat timeline back into the model's bars (bar lengths are fixed). Notes crossing a bar line become
+    tied pieces; a chord symbol splits whatever piece it falls inside so it can be written at its exact time."""
+    total = sum(it["dur"] for it in items)
+    need = sum(b.units for b in model.bars)
+    if total != need:
+        raise ValueError(f"internal: timeline is {total} units, bars need {need}")
+    # cut points: bar boundaries and chord times
+    cuts = set()
+    acc = 0
+    for b in model.bars:
+        cuts.add(acc); acc += b.units
+    cuts.update(t for t, _ in chords)
+    # expand items into pieces at every cut
+    pieces, pos = [], 0
+    for it in items:
+        start, end = pos, pos + it["dur"]
+        inner = sorted(c for c in cuts if start < c < end)
+        edges = [start] + inner + [end]
+        for k in range(len(edges) - 1):
+            pieces.append({"kind": it["kind"], "dur": edges[k + 1] - edges[k], "pitch": it["pitch"],
+                           "tie": it["kind"] == "note" and k > 0, "start": edges[k]})
+        pos = end
+    chord_at = {}
+    for t, c in chords:
+        chord_at.setdefault(t, []).append(c)
+    # distribute pieces into bars
+    pi, acc = 0, 0
+    for bar in model.bars:
+        events = []
+        bar_end = acc + bar.units
+        while pi < len(pieces) and pieces[pi]["start"] < bar_end:
+            pc = pieces[pi]
+            events.append(Event(pc["kind"], pc["dur"], pc["pitch"] if pc["kind"] == "note" else None, tie=pc["tie"],
+                                chords=list(chord_at.get(pc["start"], []))))
+            pi += 1
+        if len(events) == 1 and events[0].kind == "rest" and not events[0].chords:
+            events[0].compressed = True
+        bar.events = events
+        acc = bar_end
+
+
 def chain_of(model: Model, n: dict) -> list:
     """(bar_index, event_index) of every tied piece of sung note n, in order (may cross bar lines)."""
     out = [(n["bar"], n["ev"])]
@@ -608,16 +668,20 @@ def apply(abc: str, op: str, note_id: int, step: int | None = None) -> tuple[str
             model.bars[b].events[e].pitch = first.pitch
         msg = f"merged notes {note_id} and {note_id + 1} into one {n['name']} of {total + m['dur']} units"
     elif op == "longer":
-        nxt = lbar.events[lev_i + 1] if lev_i + 1 < len(lbar.events) else None
-        if nxt is None:
-            raise ValueError("nothing after this note in its bar to take time from (bar lengths are fixed)")
-        if nxt.kind == "note" and nxt.dur <= grid:
-            raise ValueError("the next note is already as short as it can be")
-        take = min(grid, nxt.dur)
-        last.dur += take; nxt.dur -= take
-        if nxt.dur == 0:
-            lbar.events.pop(lev_i + 1)
-        msg = f"note {note_id} is {take} units longer"
+        items, chords = flatten(model)
+        note_items = [i for i, it in enumerate(items) if it["kind"] == "note"]
+        i = note_items[note_id]
+        j = next((k for k in range(i + 1, len(items)) if items[k]["kind"] == "rest"), None)
+        if j is None:
+            raise ValueError("no pause anywhere after this note to take time from")
+        take = min(grid, items[j]["dur"])
+        items[i]["dur"] += take
+        items[j]["dur"] -= take
+        if items[j]["dur"] == 0:
+            items.pop(j)
+        rebar(model, items, chords)
+        pushed = j - i - 1
+        msg = f"note {note_id} is {take} units longer" + (f"; the next {pushed} note{'s' if pushed > 1 else ''} moved later into the pause" if pushed else "")
     elif op == "shorter":
         if total <= grid:
             raise ValueError("this note is already the shortest possible")
