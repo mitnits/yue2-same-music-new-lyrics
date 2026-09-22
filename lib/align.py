@@ -406,10 +406,11 @@ def _chips_for_line(text: str, language: str) -> list:
     return chips
 
 
-def align(model: Model, lyrics: str, language: str) -> dict:
+def align(model: Model, lyrics: str, language: str, line_extra: dict | None = None) -> dict:
     """Simple pour: section by section, the lyric lines' syllables fill the sung notes in order. One row per lyric
-    line (its notes are the ones carrying its syllables); notes left over after the last syllable go to a final
-    'held' row. Nothing is guessed."""
+    line; a line takes as many notes as it has syllables plus its `extra` (user adjustment: +1 = it took a note from
+    the next line, -1 = it gave one to the next line). Notes left over after the last line go to a 'held' row."""
+    line_extra = line_extra or {}
     notes = sung_notes(model)
     secs = sections(model)
     rests = rests_view(model)
@@ -427,13 +428,18 @@ def align(model: Model, lyrics: str, language: str) -> dict:
         # pour
         k = 0
         rows = []
+        extras = line_extra.get(str(si), {})
         for li, text in enumerate(lines):
             chips = _chips_for_line(text, language)
-            run = sec_notes[k:k + len(chips)]
-            assigned = [dict(nn, syllable={"line": li, "text": chips[j]}) for j, nn in enumerate(run)]
+            extra = int(extras.get(str(li), 0))
+            want = max(0, len(chips) + extra)
+            run = sec_notes[k:k + want]
+            assigned = [dict(nn, syllable={"line": li, "text": chips[j]} if j < len(chips) else {"line": None, "text": "~"})
+                        for j, nn in enumerate(run)]
             k += len(run)
             rows.append({"index": li, "text": text, "chips": chips, "notes": assigned, "note_count": len(run),
-                         "syllable_count": len(chips), "overflow": chips[len(run):], "empty": not text.strip()})
+                         "syllable_count": len(chips), "overflow": chips[len(run):], "empty": not text.strip(),
+                         "extra": extra})
         rest_notes = [dict(nn, syllable={"line": None, "text": "~"}) for nn in sec_notes[k:]]
         if rest_notes:
             rows.append({"index": -1, "text": "", "chips": [], "notes": rest_notes, "note_count": len(rest_notes),
@@ -454,6 +460,25 @@ def align(model: Model, lyrics: str, language: str) -> dict:
     return {"unit_den": model.unit_den, "beat": beat, "key": model.header_key, "sections": view_sections,
             "extra_lyric_sections": [b["tag"] for b in blocks[len(secs):]],
             "bars": [{"index": b.index, "units": b.units, "section": b.section} for b in model.bars]}
+
+
+def remap_extras(line_extra: dict, section: int, line: int, action: str) -> dict:
+    """Keep per-line adjustments attached to the same lines after an insert/delete."""
+    sec = str(section)
+    cur = {int(k): v for k, v in (line_extra or {}).get(sec, {}).items()}
+    new = {}
+    for k, v in cur.items():
+        if action == "insert":
+            new[k + 1 if k > line else k] = v
+        elif action == "delete":
+            if k == line:
+                continue
+            new[k - 1 if k > line else k] = v
+        else:
+            new[k] = v
+    out = dict(line_extra or {})
+    out[sec] = {str(k): v for k, v in new.items() if v}
+    return out
 
 
 def edit_lines(lyrics: str, section: int, line: int, action: str, text: str = "") -> str:

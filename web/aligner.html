@@ -108,7 +108,7 @@ function render(){
   });
   if (S.extra_lyric_sections.length) { const d = document.createElement("div"); d.className="legend over"; d.textContent = `Lyrics sections with no sung part in the score: ${S.extra_lyric_sections.join(", ")}`; root.appendChild(d); }
   const legend = document.createElement("div"); legend.className = "legend";
-  legend.textContent = "Blue = note with its syllable · grey = held note (~, the syllable continues) · dark gaps = pauses, played as silence (click one to add a pickup note) · height = pitch";
+  legend.textContent = "Blue = note with its syllable · grey = held note (~, the syllable continues) · dark gaps = pauses, played as silence (click one to add a pickup note) · height = pitch · ↑↓ take/give move one note across a line boundary";
   root.appendChild(legend);
 }
 
@@ -117,7 +117,8 @@ function lineRow(sec, L, pxu){
   const head = document.createElement("div"); head.className = "head";
   const status = L.held ? `<span class="st">${L.note_count} notes after the last syllable (held)</span>` :
       L.overflow.length ? `<span class="st bad">${L.overflow.length} without a note: <span class="over">${L.overflow.join(" ")}</span></span>` :
-      L.empty ? `<span class="st">empty line</span>` : `<span class="st good">fits</span>`;
+      L.empty ? `<span class="st">empty line${L.note_count ? ` holding ${L.note_count} notes` : ""}</span>` :
+      (L.extra > 0 ? `<span class="st">${L.extra} extra note${L.extra>1?"s":""} held (~)</span>` : `<span class="st good">fits</span>`);
   const idx = L.held ? "" : `<b class="muted">${L.index+1}.</b> `;
   const editor = L.held ? `<div class="muted">held notes — add a line above them, or more words to the line above</div>`
       : `<div style="display:flex;gap:6px;align-items:center">${idx}<input value="${L.text.replace(/"/g,'&quot;')}" placeholder="(empty line: type words here)" title="Edit this line; Enter to apply"></div>`;
@@ -125,7 +126,13 @@ function lineRow(sec, L, pxu){
     <div class="row"><span class="st">${L.note_count} notes ↔ ${L.syllable_count} syl</span> ${status}</div>
     <div class="row"><button class="small" data-play="synth" title="Play just this line as a simple synth (space)">▶ line</button>
       <button class="small" data-play="orig" title="Play the original recording for this line's bars" ${S.has_audio && S.bar_times.length ? "" : "disabled"}>▶ original</button>
-      ${L.held ? "" : `<button class="small" data-line="insert" title="Add an empty line after this one">+ line below</button>
+      ${L.held ? "" : `<span style="border-left:1px solid var(--line); height:16px; margin:0 2px"></span>
+      <button class="small" data-x="prev-" title="Take the last note of the line above (the line above gives one)" ${L.index === 0 ? "disabled" : ""}>↑ take</button>
+      <button class="small" data-x="prev+" title="Give this line's first note to the line above" ${L.index === 0 ? "disabled" : ""}>↑ give</button>
+      <button class="small" data-x="this-" title="Give this line's last note to the line below">↓ give</button>
+      <button class="small" data-x="this+" title="Take the first note of the line below">↓ take</button>
+      <span style="border-left:1px solid var(--line); height:16px; margin:0 2px"></span>
+      <button class="small" data-line="insert" title="Add an empty line after this one">+ line below</button>
       <button class="small" data-line="delete" title="Delete this line (only when it is empty)" ${L.empty ? "" : "disabled"}>✕ delete</button>`}</div>`;
   head.querySelector('[data-play="synth"]').addEventListener("click", () => playSynth(L.notes, L.events));
   head.querySelector('[data-play="orig"]').addEventListener("click", () => playOriginal(L.events.length ? L.events : L.notes));
@@ -136,6 +143,11 @@ function lineRow(sec, L, pxu){
     inp.addEventListener("blur", commit);
   }
   head.querySelectorAll("[data-line]").forEach(b => b.addEventListener("click", () => lineOp(sec.index, L.index, b.dataset.line)));
+  head.querySelectorAll("[data-x]").forEach(b => b.addEventListener("click", () => {
+    const v = b.dataset.x;  // prev-: line above gives (its extra -1); prev+: line above takes (+1); this±: this line's extra
+    if (v === "prev-") extraOp(sec.index, L.index - 1, -1); else if (v === "prev+") extraOp(sec.index, L.index - 1, +1);
+    else if (v === "this-") extraOp(sec.index, L.index, -1); else extraOp(sec.index, L.index, +1);
+  }));
   row.appendChild(head);
   row.appendChild(roll(L.events.length ? L.events : L.notes, pxu));
   return row;
@@ -199,6 +211,9 @@ async function sing(r){
   catch(e){ history.pop(); say(e.message, true); }
 }
 async function setAbc(abc){ try { applyPayload(await api("/yue2sml/set", {name: NAME, abc}), abc === null ? "back to the transcription" : "undone"); } catch(e){ say(e.message, true); } }
+async function extraOp(section, line, delta){
+  try { const r = await api("/yue2sml/extra", {name: NAME, section, line, delta}); applyPayload(r, r.msg); } catch(e){ say(e.message, true); }
+}
 async function lineOp(section, line, action, text){
   try { const r = await api("/yue2sml/lines", {name: NAME, section, line, action, text: text || ""}); applyPayload(r, r.msg); }
   catch(e){ say(e.message, true); }

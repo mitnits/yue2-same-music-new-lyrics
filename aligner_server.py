@@ -102,7 +102,7 @@ def summary(abc: str, lyrics: str, language: str, edited: bool) -> str:
 def view_payload(name: str, abc: str) -> dict:
     state = load_state(name) or {}
     model = align.parse(abc)
-    v = align.align(model, state.get("lyrics", ""), state.get("language", "English"))
+    v = align.align(model, state.get("lyrics", ""), state.get("language", "English"), state.get("line_extra") or {})
     v["rests"] = align.rests_view(model)
     v["bpm"] = int(abc_tools.parse_abc(abc).bpm)
     v["bar_times"] = state.get("bar_times", [])
@@ -206,9 +206,27 @@ def register_routes():
                                                body["action"], body.get("text", ""))
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
+        state["line_extra"] = align.remap_extras(state.get("line_extra") or {}, int(body["section"]), int(body["line"]), body["action"])
         state["lyrics_edited"] = True
         save_state(name, state)
         msg = {"insert": "empty line added", "delete": "line deleted", "set": "line updated"}[body["action"]]
+        return respond(name, state.get("edited_abc") or state["base_abc"], msg)
+
+    @routes.post("/yue2sml/extra")
+    async def extra(request):
+        """{name, section, line, delta}: +1 = this line takes one more note (from the next line), -1 = gives one."""
+        body = await request.json()
+        name = body["name"]
+        state = load_state(name) or {}
+        le = state.setdefault("line_extra", {})
+        sec, line = str(int(body["section"])), str(int(body["line"]))
+        cur = int(le.get(sec, {}).get(line, 0)) + int(body["delta"])
+        le.setdefault(sec, {})[line] = cur
+        if cur == 0:
+            le[sec].pop(line, None)
+        save_state(name, state)
+        d = int(body["delta"])
+        msg = ("took a note from the next line" if d > 0 else "gave a note to the next line") + f" (line now {cur:+d} vs its syllables)"
         return respond(name, state.get("edited_abc") or state["base_abc"], msg)
 
     @routes.get("/yue2sml/audio")
